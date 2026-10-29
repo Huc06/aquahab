@@ -109,6 +109,8 @@ Five agents plus the Keeper sits within the RESHADED target of 4–6 agents per 
 
 ### 7.3 Mission Templates (6)
 
+> **Superseded (2026-10-29).** The six templates below are replaced by the Technical & Product, Growth & Community, and Business & Operations set in `docs/features/mission-templates.md`.
+
 Templates give the demo a repeatable shape. RESHADED requires 5–8.
 
 | ID | Template | Lead | Supporting | Output |

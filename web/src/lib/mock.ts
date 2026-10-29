@@ -2,11 +2,11 @@
 import type { Agent, Mission } from "./types";
 
 export const AGENTS: Agent[] = [
-  { id: "one", name: "One", role: "Chief of staff", status: "idle", budgetCents: 150, spentCents: 0 },
+  { id: "one", name: "One", role: "Chief of Staff", status: "idle", budgetCents: 150, spentCents: 0 },
   {
     id: "researcher",
     name: "Researcher",
-    role: "Market brief",
+    role: "Head of Research",
     status: "working",
     currentTask: "Market brief",
     budgetCents: 150,
@@ -15,17 +15,17 @@ export const AGENTS: Agent[] = [
   {
     id: "builder",
     name: "Builder",
-    role: "Launch plan",
+    role: "Head of Engineering",
     status: "working",
     currentTask: "Launch plan",
     budgetCents: 150,
     spentCents: 116,
   },
-  { id: "lofi", name: "Lofi", role: "Creative", status: "idle", budgetCents: 150, spentCents: 0 },
+  { id: "lofi", name: "Lofi", role: "Head of Growth", status: "idle", budgetCents: 150, spentCents: 0 },
   {
     id: "hippo",
     name: "Hippo",
-    role: "Operations",
+    role: "Head of Finance & Ops",
     status: "assigned",
     currentTask: "Quality review",
     budgetCents: 150,

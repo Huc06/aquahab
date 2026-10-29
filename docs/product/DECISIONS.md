@@ -121,3 +121,20 @@ These decisions override §5.2 and §5.5 of `DESIGN.md` and the three-column lay
 4. **Phase 2 (unchanged list, plus):** walking agents, standup and meetings, marketplace, analytics dashboard, layout editor, real-time agent conversation, and the runtime gateway.
 
 Code reuse: Claw3D is MIT-licensed. Any copied code must keep its copyright and license notice, and the notice goes in the repository README.
+
+
+## 10. Agent role titles, v2.4 (2026-10-29)
+
+Character names stay as in PRODUCT_CONCEPT. Role titles are chosen so that all three builder groups (Technical & Product, Growth & Community, Business & Operations) understand them without explanation. Confirmed by the product owner.
+
+| Character | Role title |
+|---|---|
+| One | Chief of Staff |
+| Researcher | Head of Research |
+| Builder | Head of Engineering |
+| Lofi | Head of Growth |
+| Hippo | Head of Finance & Ops |
+
+Known trade-off: "Head of" implies management. Agents are staff, so UI copy must not suggest that agents manage people.
+
+Internal IDs (`one`, `researcher`, `builder`, `lofi`, `hippo`) and the `AgentRole` enum in DATA_MODEL.md are unchanged. Only display text changes.
