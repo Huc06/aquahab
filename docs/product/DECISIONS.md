@@ -110,3 +110,14 @@ These decisions override earlier drafts in every product doc.
 - Google sign-in via Enoki zkLogin.
 - Scheduled agents.
 - Tatum brand palette and Poppins (after written permission).
+
+## 9. Layout and scope update, v2.3 (2026-10-29)
+
+These decisions override §5.2 and §5.5 of `DESIGN.md` and the three-column layout in `docs/design/ui-layout-map.md`.
+
+1. **Layout: full-bleed 3D scene with overlays.** The scene fills the screen. Controls sit on top of it: a left icon rail (HQ, Agents, Missions), a strip of five fixed agent tabs with status dots, a status card at top right (routing progress of the running mission), a vertical tab column on the right (Vault, Briefing), an operator status bar at the bottom, and a CHAT button at bottom right. Detail views open as drawers over the scene.
+2. **Chat panel (MVP).** Assign mission and ask for status happen through the chat panel. The CEO picks an agent, types a message, and confirms the preview before any mission is created (see §8 and the earlier chat-intent proposal). Other chat intents are Phase 2.
+3. **Background music is in MVP.** A music toggle sits in the top area, default off, because browsers block autoplay until the CEO interacts with the page. The track must be licensed for this use. Source and license are recorded in `web/README.md` before the track is committed.
+4. **Phase 2 (unchanged list, plus):** walking agents, standup and meetings, marketplace, analytics dashboard, layout editor, real-time agent conversation, and the runtime gateway.
+
+Code reuse: Claw3D is MIT-licensed. Any copied code must keep its copyright and license notice, and the notice goes in the repository README.

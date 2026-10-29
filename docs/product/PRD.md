@@ -409,3 +409,12 @@ The demo is two missions of the same template, with feedback between them. The v
 - **Proof, not claims:** the two-mission demo, the recall trace, and the Proof panel.
 - **Walrus is the memory:** memories are stored, recalled, used in the next mission, and verifiable.
 - **Scoped honestly:** one HQ per CEO, Phase 2 named and not built.
+
+## Appendix: MVP scope update (v2.3, 2026-10-29)
+
+Added to MVP (see `docs/product/DECISIONS.md` §9):
+- Full-bleed HQ scene with overlay controls (left icon rail, agent tab strip, status card, right tab column, bottom status bar, CHAT button).
+- Chat panel for assigning missions and asking for status, with a confirm step before any mission is created.
+- Background music with a toggle, default off.
+
+Still Phase 2: walking agents, standup, marketplace, analytics dashboard, layout editor, real-time agent conversation, runtime gateway.

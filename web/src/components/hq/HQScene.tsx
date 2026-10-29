@@ -155,10 +155,16 @@ function Crew() {
 function Particles({ count = 60 }: { count?: number }) {
   const positions = useMemo(() => {
     const a = new Float32Array(count * 3);
+    // Seeded generator: stable positions across renders, no Math.random during render.
+    let seed = 1337;
+    const rand = () => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
     for (let i = 0; i < count; i++) {
-      a[i * 3] = (Math.random() * 2 - 1) * 1.8;
-      a[i * 3 + 1] = Math.random() * 1.2 - 0.1;
-      a[i * 3 + 2] = (Math.random() * 2 - 1) * 1.8;
+      a[i * 3] = (rand() * 2 - 1) * 1.8;
+      a[i * 3 + 1] = rand() * 1.2 - 0.1;
+      a[i * 3 + 2] = (rand() * 2 - 1) * 1.8;
     }
     return a;
   }, [count]);

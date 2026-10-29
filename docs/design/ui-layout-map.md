@@ -1,5 +1,7 @@
 # UI Layout Map (MVP)
 
+> **Superseded (2026-10-29).** The three-column shell below is replaced by a full-bleed scene with overlay controls. See docs/product/DECISIONS.md §9.
+
 | Field | Value |
 |---|---|
 | Status | Draft v1. Layout only. No visual styling, no full screens. |

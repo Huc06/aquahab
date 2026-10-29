@@ -12,13 +12,11 @@ const HQScene = dynamic(() => import("./HQScene").then((m) => m.HQScene), {
   ),
 });
 
+// Full-bleed stage. Overlays are rendered by the page on top of it.
 export function HQStage() {
   return (
     <div className="absolute inset-0">
       <HQScene />
-      <p className="pointer-events-none absolute left-4 top-3 font-mono text-[13px] text-fg-2">
-        Routing: Researcher · Builder
-      </p>
     </div>
   );
 }
