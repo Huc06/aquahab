@@ -11,7 +11,7 @@ import { SideTabs } from "@/components/shell/SideTabs";
 // Overlays are pointer-events-none by default, so the scene stays draggable behind them.
 export default function Page() {
   return (
-    <main className="pointer-events-none relative h-screen overflow-hidden bg-deep">
+    <main className="pointer-events-none relative h-screen overflow-hidden bg-deep bg-[url(/backgrounds/seabed.webp)] bg-cover bg-center">
       <HQStage />
       <AgentTabs />
       <LeftRail />

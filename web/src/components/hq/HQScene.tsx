@@ -198,7 +198,7 @@ export function HQScene() {
       <Canvas
         dpr={[1, 2]}
         gl={{ antialias: true, toneMapping: THREE.NoToneMapping }}
-        style={{ background: "#050b17" }}
+        style={{ background: "transparent" }}
         onPointerMissed={() => clearSelection(null)}
       >
         <PerspectiveCamera makeDefault position={cameraPosition()} fov={CAMERA.fov} />
