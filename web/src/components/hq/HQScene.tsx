@@ -9,6 +9,7 @@ import { AGENTS } from "@/lib/mock";
 import { CAMERA, CREW_ANIMATION, CREW_HEIGHT, DESK_SPOTS, FLOOR_Y, type DeskSpot } from "@/lib/hq-layout";
 import { useHQ } from "@/lib/store";
 import type { Agent, AgentStatus } from "@/lib/types";
+import { retint } from "@/lib/materials";
 
 const OFFICE_URL = "/models/office.glb";
 const CAPTAIN_URL = "/models/captain.glb";
@@ -24,27 +25,6 @@ const STATUS_LABEL: Record<AgentStatus, string> = {
   blocked: "Blocked",
   offline: "Offline",
 };
-
-// Same material treatment as the composition study: matte standard material,
-// keeping only the textures. Imported GLB materials are metallic and read as near-black.
-function retint(root: THREE.Object3D): THREE.Object3D {
-  root.traverse((node) => {
-    const mesh = node as THREE.Mesh;
-    if (!mesh.isMesh || !mesh.material) return;
-    const source = mesh.material as THREE.MeshStandardMaterial;
-    const material = new THREE.MeshStandardMaterial({
-      map: source.map ?? null,
-      normalMap: source.normalMap ?? null,
-      metalness: 0,
-      roughness: 0.88,
-      side: THREE.DoubleSide,
-    });
-    if (source.normalMap) material.normalScale.set(0.6, 0.6);
-    mesh.material = material;
-    mesh.frustumCulled = false;
-  });
-  return root;
-}
 
 function Office() {
   const { scene: source } = useGLTF(OFFICE_URL);

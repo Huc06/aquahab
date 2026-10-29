@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useHQ } from "@/lib/store";
 
-// The 3D scene needs WebGL and the browser, so it is loaded client-side only.
+// The 3D scenes need WebGL and the browser, so they are loaded client-side only.
 const HQScene = dynamic(() => import("./HQScene").then((m) => m.HQScene), {
   ssr: false,
   loading: () => (
@@ -12,9 +13,12 @@ const HQScene = dynamic(() => import("./HQScene").then((m) => m.HQScene), {
   ),
 });
 
-// Full-bleed stage. Overlays are rendered by the page on top of it.
+const CityStage = dynamic(() => import("../city/CityStage").then((m) => m.CityStage), { ssr: false });
+
+// Full-bleed stage. Shows the HQ or the city, depending on the view state.
 export function HQStage() {
-  return (
+  const view = useHQ((s) => s.view);
+  return view === "city" ? <CityStage /> : (
     <div className="absolute inset-0">
       <HQScene />
     </div>
