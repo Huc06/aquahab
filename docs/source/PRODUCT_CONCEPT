@@ -1,0 +1,39 @@
+Name definition:
+Aquahab = Aqua (shared digital ocean) + Habitat (a living workplace for AI agents).
+
+Context:
+
+- Character: walrus, lofi, hippo, one ….. (meme on sui)
+- **Aqua:** môi trường chung, dòng dữ liệu, memory ocean.
+- **Habitat:** văn phòng/công ty 3D nơi agent có desk, role, task và ký ức.
+- **Walrus Memory:** “memory vault” hoặc “deep-sea archive” của habitat.
+- **Tatum:** “nervous system / infrastructure layer” kết nối agent với Sui, RPC, data và AI.
+
+> Product one-liner
+Aquahab is a 3D habitat where a CEO runs a company of AI agents that remember every mission, preference, and decision.
+> 
+
+## Problem
+
+AI agents thường mất context giữa các phiên. CEO phải nhắc lại preference, ràng buộc, kết quả cũ và lý do đã từ chối phương án trước. Aquahab biến những điều đó thành **company memory**.
+
+## Solution
+
+Mỗi agent trong Aquahab có memory riêng; công ty cũng có shared memory. Walrus Memory lưu memory như một deep-sea archive, còn Tatum kết nối habitat với Sui infrastructure và AI capabilities.
+
+Roadmap
+
+Phase 1 ⇒ private/company space, nơi CEO điều hành agent team. Đây là MVP.
+Phase 2 ⇒ public 3D city, nơi các CEO/user đi lại, gặp nhau, showcase công ty AI, chat, và tham quan Memory Vault.
+
+[Aqua City — Shared Public Space]
+|
+[City Gateway / Presence Server]
+|
++-----------+------------+
+|                        |
+[User A: Aquahab HQ]   [User B: Aquahab HQ]
+|                        |
+[AI Agent Company]      [AI Agent Company]
+|                        |
+[Walrus Memory Vault]   [Walrus Memory Vault]

@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+/* Design tokens: DESIGN.md §10 (active Aquahab deep-sea set, Appendix A).
+   Do not add Tatum values here. Tatum tokens are gated (DESIGN.md Appendix B). */
+:root {
+  --color-bg-deep: #050b17;
+  --color-bg-surface: #0a1628;
+  --color-bg-raised: #0f2038;
+  --color-border-decor: #16304f;
+  --color-border-interactive: #4d6e92;
+
+  --color-text-primary: #eaf2f7;
+  --color-text-secondary: #a9bcd0;
+  --color-text-muted: #7f95ad;
+  --color-text-on-accent: #04121f;
+  --color-text-on-status: #000000;
+
+  --color-memory: #5ee7f0;
+  --color-action: #5ee7f0;
+  --color-agent-text: #a8f0f5;
+  --color-agent-icon: #3fd0be;
+  --color-ceo: #ff8a7a;
+  --color-warning: #ffc861;
+  --color-danger: #ff6b6b;
+  --color-success: #6be3a0;
+  --color-neutral: #7f95ad;
+  --color-info: #a9bcd0;
+
+  --color-focus-ring: #5ee7f0;
+
+  --scene-floor: #0c1d33;
+  --scene-wall: #12294a;
+  --scene-desk: #1a3457;
+  --scene-light-key: #cfeff5;
+  --scene-light-fill: #2b4e74;
+  --scene-particle: #5ee7f0;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --motion-micro: 120ms;
+  --motion-standard: 200ms;
+  --motion-travel: 720ms;
+  --motion-camera: 600ms;
+}
+
+/* Tailwind utilities that map to the tokens above (e.g. bg-surface, text-fg-2). */
+@theme inline {
+  --color-deep: var(--color-bg-deep);
+  --color-surface: var(--color-bg-surface);
+  --color-raised: var(--color-bg-raised);
+  --color-line-decor: var(--color-border-decor);
+  --color-line: var(--color-border-interactive);
+  --color-fg: var(--color-text-primary);
+  --color-fg-2: var(--color-text-secondary);
+  --color-fg-3: var(--color-text-muted);
+  --color-on-accent: var(--color-text-on-accent);
+  --color-on-status: var(--color-text-on-status);
+  --color-mem: var(--color-memory);
+  --color-action-fill: var(--color-action);
+  --color-agent: var(--color-agent-text);
+  --color-agent-dot: var(--color-agent-icon);
+  --color-ceo-accent: var(--color-ceo);
+  --color-warn: var(--color-warning);
+  --color-bad: var(--color-danger);
+  --color-ok: var(--color-success);
+  --color-idle: var(--color-neutral);
+  --color-info-text: var(--color-info);
+  --color-focus: var(--color-focus-ring);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--color-bg-deep);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 22px;
+  overflow: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-travel: 120ms;
+    --motion-camera: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    transition-duration: 0ms !important;
+  }
+}
