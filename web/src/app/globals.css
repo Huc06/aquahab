@@ -102,3 +102,36 @@ body {
     transition-duration: 0ms !important;
   }
 }
+
+/* Intro sequence (components/intro/Intro.tsx). Total about 3.4 s. */
+@keyframes intro-bg-zoom {
+  from { transform: scale(1.06); }
+  to { transform: scale(1); }
+}
+@keyframes intro-logo {
+  0% { opacity: 0; transform: scale(0.8); }
+  35% { opacity: 1; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes intro-rays {
+  0% { opacity: 0; }
+  100% { opacity: 0.7; }
+}
+@keyframes intro-bubbles-gather {
+  from { transform: scale(1); }
+  to { transform: scale(0.85); }
+}
+@keyframes intro-flash {
+  0% { opacity: 0; }
+  40% { opacity: 0.35; }
+  100% { opacity: 0; }
+}
+.intro-bg { animation: intro-bg-zoom 3.4s ease-out both; }
+.intro-logo { animation: intro-logo 0.9s 0.2s cubic-bezier(0.2, 0, 0, 1) both; }
+.intro-rays {
+  background: linear-gradient(180deg, rgba(94, 231, 240, 0.35) 0%, rgba(94, 231, 240, 0) 70%);
+  mask-image: repeating-linear-gradient(90deg, transparent 0 40px, #000 60px 90px, transparent 110px 150px);
+  animation: intro-rays 1.6s 0.8s ease-out both;
+}
+.intro-bubbles { animation: intro-bubbles-gather 2.3s 0.2s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.intro-flash { animation: intro-flash 0.6s 2.2s ease-in-out both; }

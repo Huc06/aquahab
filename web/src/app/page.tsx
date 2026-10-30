@@ -1,4 +1,5 @@
 import { HQStage } from "@/components/hq/HQStage";
+import { Intro } from "@/components/intro/Intro";
 import { HQOverlays } from "@/components/shell/HQOverlays";
 import { BottomBar } from "@/components/shell/BottomBar";
 import { ViewSwitch } from "@/components/shell/ViewSwitch";
@@ -11,6 +12,7 @@ export default function Page() {
       <HQStage />
       <HQOverlays />
       <ViewSwitch />
+      <Intro />
       <BottomBar />
     </main>
   );
