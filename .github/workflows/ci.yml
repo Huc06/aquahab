@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'web/**'
+              - '.github/workflows/ci.yml'
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+
+  # Required check. Skipped jobs report "skipped", so this gate decides the result, not the per-area jobs.
+  ci:
+    needs: [changes, web]
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      WEB_CHANGED: ${{ needs.changes.outputs.web }}
+      WEB_RESULT: ${{ needs.web.result }}
+    steps:
+      - name: Check results
+        run: |
+          if [ "$WEB_CHANGED" = "true" ] && [ "$WEB_RESULT" != "success" ]; then
+            echo "web job result: $WEB_RESULT"
+            exit 1
+          fi
+          echo "CI passed"

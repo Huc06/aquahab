@@ -3,15 +3,18 @@
 import { useEffect } from "react";
 import { AGENTS, COMPANY_BUDGET, MISSIONS } from "@/lib/mock";
 import { useHQ, type DrawerKind } from "@/lib/store";
+import { ReviewPanel } from "@/components/review/ReviewPanel";
 
 const TITLE: Record<Exclude<DrawerKind, null>, string> = {
   missions: "Missions",
   vault: "Memory Vault",
   briefing: "Briefing",
   agent: "Agent",
+  review: "Review output",
 };
 
 function Missions() {
+  const setDrawer = useHQ((s) => s.setDrawer);
   return (
     <ul className="space-y-2">
       {MISSIONS.map((m) => (
@@ -21,6 +24,15 @@ function Missions() {
           <p className="mt-1 font-mono text-[13px] text-fg-3">
             {m.status} · {m.taskCount} tasks · {m.spentCents}¢ of {m.budgetCents}¢
           </p>
+          {m.status === "review" && (
+            <button
+              type="button"
+              onClick={() => setDrawer("review")}
+              className="mt-2 rounded-md border border-line px-3 py-1 text-sm text-fg focus-visible:outline-focus"
+            >
+              Review output
+            </button>
+          )}
         </li>
       ))}
     </ul>
@@ -127,6 +139,7 @@ export function Drawer() {
         {drawer === "vault" && <Vault />}
         {drawer === "briefing" && <Briefing />}
         {drawer === "agent" && <AgentDetail />}
+        {drawer === "review" && <ReviewPanel />}
       </div>
     </aside>
   );

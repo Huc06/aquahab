@@ -10,7 +10,7 @@ Phase 1 (MVP): one private HQ, demo CEO session, operator-managed Walrus Memory,
 |---|---|---|
 | `CLAUDE.md` | Working rules for Claude Code | Always first |
 | `DESIGN.md` | Design system: colors, type, layout, components, motion, copy. Read by OpenDesign and Claude Code. | Any UI work |
-| `web/` | Frontend app (Next.js, TypeScript, Tailwind, React Three Fiber). Run with `npm run dev` inside `web/`. | Building UI |
+| `web/` | Frontend app (Next.js, TypeScript, Tailwind, React Three Fiber). Run with `pnpm dev` inside `web/`. | Building UI |
 | `docs/source/` | Source documents: product concept, RESHADED V1–V3, research notes | Starting point, or when a decision is unclear |
 | `docs/product/PRD.md` | Product requirements, MVP scope, user stories, demo criteria | Scope questions |
 | `docs/product/DECISIONS.md` | Accepted decisions. Overrides earlier drafts (latest section wins). | Any conflict between documents |

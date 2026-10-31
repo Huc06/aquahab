@@ -5,9 +5,10 @@ Frontend for the Aquahab HQ. Stack: Next.js (App Router), TypeScript, Tailwind C
 ## Run
 
 ```
-npm install
-npm run dev      # http://localhost:3000
-npm run build    # production build
+pnpm install
+pnpm dev        # http://localhost:3000
+pnpm build      # production build
+pnpm check      # typecheck, lint, build (same as CI)
 ```
 
 ## Layout
