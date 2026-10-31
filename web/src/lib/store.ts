@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import type { AgentId } from "./types";
 
-export type DrawerKind = "missions" | "vault" | "briefing" | "agent" | null;
+export type DrawerKind = "missions" | "vault" | "briefing" | "agent" | "review" | null;
 export type ViewKind = "hq" | "city";
 
 // View state only. Business state comes from the API (RESHADED V1 stack, DESIGN.md §5.2).
