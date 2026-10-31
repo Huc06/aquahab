@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "ci": "npm run typecheck && npm run lint && npm run build"
+    "check": "pnpm typecheck && pnpm lint && pnpm build"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

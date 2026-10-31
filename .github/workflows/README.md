@@ -2,9 +2,9 @@
 
 | Workflow | Purpose | Trigger |
 |---|---|---|
-| `ci.yml` (CI) | Runs `npm run ci` in `web/` (typecheck, lint, build) when `web/` changes. The `ci` job is the required check. | Pull requests, pushes to `main` |
+| `ci.yml` (CI) | Runs `pnpm check` in `web/` (typecheck, lint, build) when `web/` changes. The `ci` job is the required check. | Pull requests, pushes to `main` |
 
-Run the same checks on a development machine: `cd web && npm ci && npm run ci`.
+Run the same checks on a development machine: `cd web && pnpm install && pnpm check`.
 
 ## Required check
 
