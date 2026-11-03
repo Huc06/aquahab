@@ -1,5 +1,7 @@
 # Aquahab — API Design (MVP, Phase 1)
 
+> **Superseded for implementation by the crew server (DECISIONS §11).** The live contract is [`server/src/contract.ts`](../../server/src/contract.ts), copied to `web/src/lib/api-types.ts` by `pnpm contract:sync`, with every route listed in [`server/README.md`](../../server/README.md). This document is kept as design history.
+
 | Field | Value |
 |---|---|
 | Status | Draft v1.0 (aligned to `RESHADED_RE_SCAFFOLD_V1.md` §A) |
