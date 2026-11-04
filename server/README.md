@@ -39,7 +39,22 @@ Memory line format (recall has no tag filters, so the type lives in the text):
 | failure, done | Builder | | story | Lofi |
 | learned | Researcher | | preference, feedback | Walrus Keeper |
 
-## Run it
+## Frontend work: no keys needed
+
+```bash
+cd server && pnpm install && pnpm dev:mock     # API on :8787, in-memory Walrus mock, a seeded "Aquahab" room
+cd web && pnpm dev                              # http://localhost:3000, /api is proxied to :8787
+```
+
+`dev:mock` loads [`.env.mock`](.env.mock): the real API and the real Keeper, brief and debrief code, over the
+SDK's `MemWalMock`. Nothing reaches Walrus, Sui, Tatum, an LLM or Telegram, and every write is allowed
+(`AUTH=off`). To see live mainnet data instead, point the web app at the deployed server:
+`API_ORIGIN=https://<server> pnpm dev`.
+
+Only one real (mainnet) server runs at a time: the Telegram bot accepts a single poller, and each server
+keeps its own ledger of rooms and briefs.
+
+## Run it (mainnet)
 
 ```bash
 cd server

@@ -7,6 +7,7 @@ import { db } from "./db.ts";
 import { startScheduler } from "./scheduler.ts";
 import { startPolling, watchStored } from "./telegram.ts";
 import { hiredRoles, isMock } from "./memory/walrus.ts";
+import { seedMock } from "./mock-seed.ts";
 
 // The submission must run on mainnet memory: refuse to deploy a mock, or an open write API.
 if (process.env.NODE_ENV === "production") {
@@ -15,6 +16,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 await db();
+if (isMock() && process.env.MOCK_SEED === "1") await seedMock();
 watchStored();
 if (env.schedulerEnabled()) startScheduler();
 if (env.telegramMode() === "poll") await startPolling().catch((e) => console.warn(`[telegram] ${(e as Error).message}`));
