@@ -3,7 +3,7 @@
 import { useHQ, type DrawerKind } from "@/lib/store";
 
 const ITEMS: { kind: Exclude<DrawerKind, "agent" | null>; label: string; glyph: string }[] = [
-  { kind: "missions", label: "Missions", glyph: "▤" },
+  { kind: "rooms", label: "Rooms", glyph: "⌂" },
   { kind: "vault", label: "Memory Vault", glyph: "◈" },
   { kind: "briefing", label: "Briefing", glyph: "≡" },
 ];

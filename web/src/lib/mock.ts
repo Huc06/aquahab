@@ -1,5 +1,5 @@
 // Mock data for the UI scaffold only. Replace with API data (docs/architecture/API_DESIGN.md).
-import type { Agent, Mission } from "./types";
+import type { Agent } from "./types";
 
 export const AGENTS: Agent[] = [
   { id: "one", name: "One", role: "Chief of Staff", status: "idle", budgetCents: 150, spentCents: 0 },
@@ -29,36 +29,6 @@ export const AGENTS: Agent[] = [
     status: "assigned",
     currentTask: "Quality review",
     budgetCents: 150,
-    spentCents: 0,
-  },
-];
-
-export const MISSIONS: Mission[] = [
-  {
-    id: "m-001",
-    title: "Vietnam wallet launch",
-    objective: "Plan a Sui wallet launch for Vietnam.",
-    status: "active",
-    taskCount: 3,
-    budgetCents: 500,
-    spentCents: 286,
-  },
-  {
-    id: "m-002",
-    title: "Source review",
-    objective: "Check citations for the market brief.",
-    status: "review",
-    taskCount: 1,
-    budgetCents: 100,
-    spentCents: 86,
-  },
-  {
-    id: "m-003",
-    title: "First memory",
-    objective: "Prepare the first CEO preference.",
-    status: "draft",
-    taskCount: 0,
-    budgetCents: 100,
     spentCents: 0,
   },
 ];

@@ -1,69 +1,20 @@
 "use client";
 
 import { useEffect } from "react";
-import { AGENTS, COMPANY_BUDGET, MISSIONS } from "@/lib/mock";
+import { AGENTS, COMPANY_BUDGET } from "@/lib/mock";
 import { useHQ, type DrawerKind } from "@/lib/store";
+import { RoomsPanel } from "@/components/rooms/RoomsPanel";
+import { VaultPanel } from "@/components/memory/VaultPanel";
+import { BriefingPanel } from "@/components/briefing/BriefingPanel";
 import { ReviewPanel } from "@/components/review/ReviewPanel";
 
 const TITLE: Record<Exclude<DrawerKind, null>, string> = {
-  missions: "Missions",
-  vault: "Memory Vault",
-  briefing: "Briefing",
+  rooms: "Rooms",
+  vault: "Memory",
+  briefing: "Morning brief",
   agent: "Agent",
-  review: "Review output",
+  review: "Evening debrief",
 };
-
-function Missions() {
-  const setDrawer = useHQ((s) => s.setDrawer);
-  return (
-    <ul className="space-y-2">
-      {MISSIONS.map((m) => (
-        <li key={m.id} className="rounded-md border border-line bg-raised p-3">
-          <p className="text-sm font-semibold text-fg">{m.title}</p>
-          <p className="text-sm text-fg-2">{m.objective}</p>
-          <p className="mt-1 font-mono text-[13px] text-fg-3">
-            {m.status} · {m.taskCount} tasks · {m.spentCents}¢ of {m.budgetCents}¢
-          </p>
-          {m.status === "review" && (
-            <button
-              type="button"
-              onClick={() => setDrawer("review")}
-              className="mt-2 rounded-md border border-line px-3 py-1 text-sm text-fg focus-visible:outline-focus"
-            >
-              Review output
-            </button>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function Vault() {
-  return (
-    <div className="space-y-3 text-sm text-fg-2">
-      <p>
-        Company memory: <span className="font-mono text-fg">14 memories · 48 KB</span>
-      </p>
-      <p className="text-fg-3">Stored until a date. Expired memory stays visible.</p>
-      <p className="text-fg-3">Memory items load from Walrus once the backend is connected.</p>
-    </div>
-  );
-}
-
-function Briefing() {
-  const sections = ["Active missions", "Recent decisions", "Open risks", "Memory added this week"];
-  return (
-    <div className="space-y-4">
-      {sections.map((s) => (
-        <section key={s}>
-          <h3 className="text-sm font-semibold text-fg">{s}</h3>
-          <p className="text-sm text-fg-3">Nothing recorded yet.</p>
-        </section>
-      ))}
-    </div>
-  );
-}
 
 function AgentDetail() {
   const id = useHQ((s) => s.selectedAgent);
@@ -135,9 +86,9 @@ export function Drawer() {
         </button>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {drawer === "missions" && <Missions />}
-        {drawer === "vault" && <Vault />}
-        {drawer === "briefing" && <Briefing />}
+        {drawer === "rooms" && <RoomsPanel />}
+        {drawer === "vault" && <VaultPanel />}
+        {drawer === "briefing" && <BriefingPanel />}
         {drawer === "agent" && <AgentDetail />}
         {drawer === "review" && <ReviewPanel />}
       </div>

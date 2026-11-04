@@ -3,7 +3,7 @@
 import { useHQ, type DrawerKind } from "@/lib/store";
 
 // Vertical tab column on the right edge. Opens the matching drawer.
-const TABS: { kind: Exclude<DrawerKind, "agent" | "missions" | null>; label: string }[] = [
+const TABS: { kind: Exclude<DrawerKind, "agent" | "rooms" | "review" | null>; label: string }[] = [
   { kind: "vault", label: "VAULT" },
   { kind: "briefing", label: "BRIEFING" },
 ];
