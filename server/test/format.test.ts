@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatMemory, guessType, parseCapture, parseMemory, redact } from "../src/memory/format.ts";
-import { blobIdToU256, dayIndex, u256ToBlobId } from "../src/util.ts";
+import { blobIdToU256, dayIndex, slugify, u256ToBlobId } from "../src/util.ts";
 import { isDue } from "../src/scheduler.ts";
 
 describe("memory line format", () => {
@@ -67,5 +67,13 @@ describe("schedule", () => {
   it("counts days from the room's first day", () => {
     expect(dayIndex("2026-11-03", "2026-11-03")).toBe(1);
     expect(dayIndex("2026-11-03", "2026-11-10")).toBe(8);
+  });
+});
+
+describe("slugify", () => {
+  it("folds Vietnamese accents, including đ", () => {
+    expect(slugify("Dự án Hulk")).toBe("du-an-hulk");
+    expect(slugify("Đà Lạt trip")).toBe("da-lat-trip");
+    expect(slugify("Tact v2!")).toBe("tact-v2");
   });
 });

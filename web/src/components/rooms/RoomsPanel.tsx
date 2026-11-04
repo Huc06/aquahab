@@ -9,8 +9,9 @@ const button = "rounded-md border border-line px-3 py-1 text-sm text-fg focus-vi
 
 // Rooms are real projects. Each room is one Walrus Memory namespace on the crew server.
 export function RoomsPanel() {
-  const { rooms, room, loading, error, reload } = useActiveRoom();
+  const { rooms, room, loading, error } = useActiveRoom();
   const setRoomId = useHQ((s) => s.setRoomId);
+  const roomsChanged = useHQ((s) => s.roomsChanged);
   const setDrawer = useHQ((s) => s.setDrawer);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -22,11 +23,11 @@ export function RoomsPanel() {
     setBusy(true);
     setMessage(null);
     try {
-      const slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-      const created = await api.createRoom({ slug, name: trimmed });
+      // The server slugifies (it folds accents, so "Dự án" becomes "du-an").
+      const created = await api.createRoom({ slug: trimmed, name: trimmed });
       setName("");
       setRoomId(created.id);
-      reload();
+      roomsChanged();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Could not create the room.");
     } finally {
