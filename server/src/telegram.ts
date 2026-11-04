@@ -1,0 +1,470 @@
+// The crew on Telegram: where the CEO actually lives during the day.
+//   morning   the brief arrives, with receipts and 👍 / 👎
+//   any time  `d:` `f:` `n:` quick capture, or a free note the crew turns into proposals
+//   evening   the debrief question; the reply becomes proposals the CEO keeps or drops
+// One CEO per deployment: the first chat that sends `/start <pair code>` is bound, everyone else is refused.
+import { CREW, walruscanBlob, type Brief, type Candidate, type MemoryJob, type Room } from "./contract.ts";
+import { env } from "./env.ts";
+import { getSetting, q, setSetting } from "./db.ts";
+import { subscribe } from "./events.ts";
+import { ActionError, answerDebrief, capture, decide, getCandidate, listCandidates, openDebrief, rateBrief } from "./actions.ts";
+import { getBrief, latestBrief, runBrief } from "./brief.ts";
+import { answerFromMemory } from "./llm.ts";
+import { recall } from "./memory/walrus.ts";
+import { EmptyMemoryError } from "./memory/keeper.ts";
+import { parseCapture, parseMemory } from "./memory/format.ts";
+import { createRoom, getRoom, listRooms, RoomError, updateRoom } from "./rooms.ts";
+import { magicLink } from "./auth.ts";
+import { crewView } from "./views.ts";
+import { escapeHtml as esc, isHHMM } from "./util.ts";
+
+type Markup = { inline_keyboard: { text: string; callback_data?: string; url?: string }[][] };
+
+async function tg<T = any>(method: string, body: Record<string, unknown>): Promise<T> {
+  const token = env.telegramToken();
+  if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not set");
+  const r = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    // A half-open socket after a network drop would otherwise stall the poll loop.
+    signal: AbortSignal.timeout(method === "getUpdates" ? ((body.timeout as number) ?? 0) * 1000 + 15_000 : 20_000),
+  });
+  const j: any = await r.json();
+  if (!j.ok && !/message is not modified/.test(j.description ?? "")) throw new Error(`telegram ${method}: ${j.description}`);
+  return j.result as T;
+}
+
+export async function send(chatId: number, html: string, markup?: Markup, replyTo?: number): Promise<number> {
+  const m = await tg<{ message_id: number }>("sendMessage", {
+    chat_id: chatId,
+    text: html,
+    parse_mode: "HTML",
+    link_preview_options: { is_disabled: true },
+    ...(markup ? { reply_markup: markup } : {}),
+    ...(replyTo ? { reply_parameters: { message_id: replyTo, allow_sending_without_reply: true } } : {}),
+  });
+  return m.message_id;
+}
+
+async function edit(chatId: number, messageId: number, html: string, markup?: Markup) {
+  await tg("editMessageText", {
+    chat_id: chatId,
+    message_id: messageId,
+    text: html,
+    parse_mode: "HTML",
+    link_preview_options: { is_disabled: true },
+    reply_markup: markup ?? { inline_keyboard: [] },
+  }).catch((e) => console.warn(`[telegram] edit: ${(e as Error).message}`));
+}
+
+export const ceoChat = () => getSetting<number>("telegram.chat");
+
+async function activeRoom(): Promise<Room | null> {
+  const id = await getSetting<string>("telegram.room");
+  const room = id ? await getRoom(id) : null;
+  return room ?? (await listRooms())[0] ?? null;
+}
+
+// ---------- rendering ----------
+
+const shortBlob = (b: string) => `${b.slice(0, 6)}…`;
+
+export function renderBrief(room: Room, b: Brief): { html: string; markup: Markup } {
+  const notes: string[] = [];
+  const out = [`<b>${esc(room.name)}</b> · day ${b.dayIndex} brief`];
+  for (const s of b.sections) {
+    out.push("", `<b>${esc(CREW[s.agent].name)}</b> · ${esc(s.title)}`);
+    for (const l of s.lines) {
+      const refs = l.cites.map((c) => {
+        let i = notes.indexOf(c);
+        if (i < 0) i = notes.push(c) - 1;
+        return i + 1;
+      });
+      out.push(`• ${esc(l.text)}${refs.length ? ` <i>[${refs.join(",")}]</i>` : ""}`);
+    }
+  }
+  if (b.source === "fallback") out.push("", "<i>Written without the model today; lines are the newest memories of each type.</i>");
+  const markup: Markup = {
+    inline_keyboard: [
+      [
+        { text: "👍 Useful", callback_data: `fb:up:${b.id}` },
+        { text: "👎 Not useful", callback_data: `fb:down:${b.id}` },
+      ],
+      ...(notes.length ? [[{ text: `Receipts (${notes.length})`, callback_data: `why:${b.id}` }]] : []),
+      [{ text: "Open the office", url: env.appUrl() }],
+    ],
+  };
+  return { html: out.join("\n"), markup };
+}
+
+function receiptsHtml(b: Brief): string {
+  const notes: string[] = [];
+  for (const s of b.sections) for (const l of s.lines) for (const c of l.cites) if (!notes.includes(c)) notes.push(c);
+  return [
+    "<b>Receipts</b>: the Walrus memories this brief was built from.",
+    ...notes.map((c, i) => `[${i + 1}] <a href="${walruscanBlob(c)}">${esc(shortBlob(c))}</a>`),
+  ].join("\n");
+}
+
+const jobLine = (j: MemoryJob) =>
+  j.status === "stored"
+    ? `✓ Stored on Walrus · <a href="${walruscanBlob(j.blobId!)}">${esc(shortBlob(j.blobId!))}</a>`
+    : j.status === "failed"
+      ? `✗ Not stored: ${esc(j.error ?? "error")}`
+      : j.status === "pending"
+        ? "… Writing to Walrus"
+        : "… Queued";
+
+function candidatesView(room: Room, cands: (Candidate & { keep: boolean })[], debriefId: string): { html: string; markup: Markup } {
+  if (!cands.length) {
+    return { html: `<b>${esc(room.name)}</b> · nothing worth keeping in that note. That's fine.`, markup: { inline_keyboard: [] } };
+  }
+  const html = [
+    `<b>${esc(room.name)}</b> · the crew proposes ${cands.length} ${cands.length === 1 ? "memory" : "memories"}. Tap to keep or drop, then file.`,
+    "",
+    ...cands.map((c, i) => `${c.keep ? "✅" : "▫️"} ${i + 1}. <b>${c.type}</b> · ${esc(CREW[c.agent].name)}\n${esc(c.text)}`),
+  ].join("\n");
+  const kept = cands.filter((c) => c.keep).length;
+  const markup: Markup = {
+    inline_keyboard: [
+      cands.map((c, i) => ({ text: `${c.keep ? "✅" : "▫️"} ${i + 1}`, callback_data: `t:${c.id}` })),
+      [
+        { text: kept ? `File ${kept} to Walrus` : "Drop all", callback_data: `file:${debriefId}` },
+      ],
+    ],
+  };
+  return { html, markup };
+}
+
+async function proposedWithKeep(roomId: string) {
+  const rows = await q(`select id, keep from candidates where room_id = $1 and status = 'proposed' order by created_at asc`, [roomId]);
+  const keep = new Map(rows.map((r) => [r.id, !!r.keep]));
+  return (await listCandidates(roomId)).map((c) => ({ ...c, keep: keep.get(c.id) ?? true }));
+}
+
+// ---------- outbound (scheduler) ----------
+
+export async function deliverBrief(room: Room, b: Brief) {
+  const chat = await ceoChat();
+  if (!chat || !env.telegramToken()) return;
+  const { html, markup } = renderBrief(room, b);
+  const mid = await send(chat, html, markup);
+  await q(`update briefs set telegram_message_id = $2 where id = $1`, [b.id, mid]);
+}
+
+export async function askDebrief(room: Room) {
+  const chat = await ceoChat();
+  if (!chat || !env.telegramToken()) return;
+  const mid = await send(
+    chat,
+    [
+      `<b>${esc(room.name)}</b> · evening debrief`,
+      "How did today go? A few lines is plenty: what you decided, what broke, what's next.",
+      "<i>Reply to this message. The crew will propose memories and you keep the ones that matter.</i>",
+    ].join("\n"),
+  );
+  await openDebrief(room, mid);
+}
+
+// ---------- inbound ----------
+
+const HELP = [
+  "<b>Aquahab</b> · your project crew remembers where you left off.",
+  "",
+  "<b>Capture any time</b> (goes to the current room)",
+  "<code>d:</code> decision · <code>f:</code> failed · <code>n:</code> next · <code>done:</code> shipped",
+  "<code>l:</code> learned · <code>due:</code> deadline · <code>s:</code> story · <code>p:</code> how you like briefs",
+  "Or just write a note, and the crew proposes what to remember.",
+  "",
+  "<b>Commands</b>",
+  "/rooms switch room · /new name · /brief now · /debrief now",
+  "/ask question · /memories · /crew · /times 08:30 21:00 · /web",
+].join("\n");
+
+async function bind(chatId: number, text: string): Promise<boolean> {
+  const bound = await ceoChat();
+  if (bound === chatId) return true;
+  const code = env.telegramPairCode();
+  const given = text.split(/\s+/)[1];
+  if (!bound && (!code || given === code)) {
+    await setSetting("telegram.chat", chatId);
+    return true;
+  }
+  return false;
+}
+
+async function handleText(chatId: number, messageId: number, text: string, replyTo: number | null) {
+  const t = text.trim();
+  if (t.startsWith("/start")) {
+    if (!(await bind(chatId, t))) return void (await send(chatId, "This crew works for one CEO. Ask the owner for the pair code."));
+    const rooms = await listRooms();
+    await send(chatId, `${HELP}\n\n${rooms.length ? `Rooms: ${rooms.map((r) => esc(r.name)).join(", ")}` : "Create your first room: <code>/new Aquahab</code>"}`);
+    return;
+  }
+  if ((await ceoChat()) !== chatId) return void (await send(chatId, "This crew works for one CEO."));
+
+  const [cmd, ...rest] = t.split(/\s+/);
+  const arg = rest.join(" ").trim();
+  const room = await activeRoom();
+
+  switch (cmd.split("@")[0]) {
+    case "/help":
+      return void (await send(chatId, HELP));
+    case "/new": {
+      if (!arg) return void (await send(chatId, "Name the project: <code>/new Aquahab</code> (add <code>private</code> to hide its name on-chain)."));
+      const isPrivate = /\bprivate\b/i.test(arg);
+      const name = arg.replace(/\bprivate\b/i, "").trim();
+      try {
+        const r = await createRoom({ slug: name, name, private: isPrivate });
+        await setSetting("telegram.room", r.id);
+        await send(chatId, `Room <b>${esc(r.name)}</b> is open. Namespace <code>${esc(r.namespace)}</code>. Brief ${r.briefAt}, debrief ${r.debriefAt}.`);
+        const b = await runBrief(r, "day-one");
+        const { html, markup } = renderBrief(r, b);
+        await send(chatId, html, markup);
+      } catch (e) {
+        await send(chatId, esc((e as Error).message));
+      }
+      return;
+    }
+    case "/rooms": {
+      const rooms = await listRooms();
+      if (!rooms.length) return void (await send(chatId, "No rooms yet. <code>/new Aquahab</code>"));
+      return void (await send(chatId, "Pick the room your notes go to:", {
+        inline_keyboard: rooms.map((r) => [{ text: `${r.id === room?.id ? "● " : ""}${r.name} · ${r.memoryCount} memories`, callback_data: `room:${r.id}` }]),
+      }));
+    }
+    case "/room": {
+      const r = arg ? await getRoom(arg) : null;
+      if (!r) return void (await send(chatId, "No such room. /rooms lists them."));
+      await setSetting("telegram.room", r.id);
+      return void (await send(chatId, `Notes now go to <b>${esc(r.name)}</b>.`));
+    }
+  }
+  if (!room) return void (await send(chatId, "Create a room first: <code>/new Aquahab</code>"));
+
+  switch (cmd.split("@")[0]) {
+    case "/brief": {
+      const wait = await send(chatId, `<i>${esc(room.name)}: recalling from Walrus…</i>`);
+      const b = await runBrief(room, "manual");
+      const { html, markup } = renderBrief(room, b);
+      await edit(chatId, wait, html, markup);
+      await q(`update briefs set telegram_message_id = $2 where id = $1`, [b.id, wait]);
+      return;
+    }
+    case "/debrief":
+      return void (await askDebrief(room));
+    case "/skip":
+      await q(`update debriefs set status='skipped' where room_id=$1 and status='asked'`, [room.id]);
+      return void (await send(chatId, "Skipped tonight's debrief."));
+    case "/ask": {
+      if (!arg) return void (await send(chatId, "Ask something: <code>/ask what did we decide about Tatum?</code>"));
+      const res = await recall({ namespace: room.namespace, query: arg, sort: "relevance", limit: 8, purpose: "ask", roomId: room.id, as: "researcher" });
+      const coded = res.hits.map((h, i) => ({ code: `m${i + 1}`, blobId: h.blob_id, text: h.text }));
+      const a = await answerFromMemory(arg, room.name, coded);
+      const cited = a.cites.map((c) => coded.find((m) => m.code === c)).filter(Boolean) as typeof coded;
+      return void (await send(
+        chatId,
+        [`<b>${esc(room.name)}</b> · ${esc(arg)}`, "", esc(a.answer), ...cited.map((m, i) => `<i>[${i + 1}] <a href="${walruscanBlob(m.blobId)}">${esc(shortBlob(m.blobId))}</a></i>`)].join("\n"),
+      ));
+    }
+    case "/memories": {
+      const rows = await q(`select * from memory_jobs where room_id = $1 order by created_at desc limit 10`, [room.id]);
+      if (!rows.length) return void (await send(chatId, `${esc(room.name)} has no memories yet.`));
+      return void (await send(
+        chatId,
+        [`<b>${esc(room.name)}</b> · latest memories`, ...rows.map((r) => `• <b>${r.type}</b> · ${esc(r.body)}\n  <i>${r.status === "stored" ? `stored ${shortBlob(r.blob_id)}` : r.status}</i>`)].join("\n"),
+      ));
+    }
+    case "/crew": {
+      const crew = await crewView();
+      return void (await send(
+        chatId,
+        [
+          `<b>Crew</b> · read from Sui (${crew.source})`,
+          ...crew.agents.map((a) => `• <b>${esc(a.name)}</b>${a.title ? ` · ${esc(a.title)}` : ""} · ${a.memoryCount} memories${a.hiredAt ? ` · hired ${a.hiredAt.slice(0, 10)}` : ""}`),
+          ...(crew.vacancies.length ? [`Vacant: ${crew.vacancies.map((r) => CREW[r].name).join(", ")}`] : []),
+        ].join("\n"),
+      ));
+    }
+    case "/times": {
+      const [briefAt, debriefAt] = rest;
+      if (!briefAt || !isHHMM(briefAt) || (debriefAt && !isHHMM(debriefAt))) return void (await send(chatId, "Use 24-hour times: <code>/times 08:30 21:00</code>"));
+      const r = await updateRoom(room.id, { briefAt, debriefAt });
+      return void (await send(chatId, `${esc(r.name)}: brief at ${r.briefAt}, debrief at ${r.debriefAt} (${esc(r.timezone)}).`));
+    }
+    case "/web":
+      return void (await send(chatId, "Your office (link valid 15 minutes):", { inline_keyboard: [[{ text: "Open Aquahab as CEO", url: magicLink() }]] }));
+  }
+  if (cmd.startsWith("/")) return void (await send(chatId, HELP));
+
+  // Plain text: a reply to the feedback question, a debrief answer, a quick capture, or a free note.
+  const awaiting = await getSetting<{ kind: "feedback"; briefId: string } | null>("telegram.await");
+  if (awaiting?.kind === "feedback") {
+    await setSetting("telegram.await", null);
+    await rateBrief(awaiting.briefId, "down", t, null);
+    return void (await send(chatId, "Noted. The Keeper filed it, and the next brief will follow it."));
+  }
+
+  const debrief = replyTo
+    ? (await q(`select d.id, d.room_id from debriefs d where d.telegram_message_id = $1 and d.status = 'asked'`, [replyTo]))[0]
+    : (await q(`select id, room_id from debriefs where status = 'asked' and created_at > now() - interval '6 hours' order by created_at desc limit 1`))[0];
+  const target = debrief ? ((await getRoom(debrief.room_id)) ?? room) : room;
+
+  if (!debrief && parseCapture(t).type) {
+    const wait = await send(chatId, `<i>Filing to ${esc(target.name)}…</i>`, undefined, messageId);
+    try {
+      const job = await capture(target, t, { chatId, messageId: wait });
+      await edit(chatId, wait, `<b>${job.type}</b> · filed by ${esc(CREW[job.agent].name)} in ${esc(target.name)}\n${jobLine(job)}`);
+    } catch (e) {
+      await edit(chatId, wait, esc(e instanceof EmptyMemoryError || e instanceof ActionError ? e.message : `Could not file that: ${(e as Error).message}`));
+    }
+    return;
+  }
+
+  const wait = await send(chatId, `<i>${esc(target.name)}: the crew is reading your note…</i>`, undefined, messageId);
+  const cands = await answerDebrief(target, t, debrief?.id ?? null);
+  const latest = (await q(`select debrief_id from candidates where room_id = $1 and status = 'proposed' limit 1`, [target.id]))[0]?.debrief_id ?? debrief?.id ?? "none";
+  const view = candidatesView(target, cands.map((c) => ({ ...c, keep: true })), latest);
+  await edit(chatId, wait, view.html, view.markup);
+}
+
+async function handleCallback(chatId: number, messageId: number, data: string, callbackId: string) {
+  const ack = (text?: string) => tg("answerCallbackQuery", { callback_query_id: callbackId, ...(text ? { text } : {}) }).catch(() => {});
+  if ((await ceoChat()) !== chatId) return void (await ack("Not your crew."));
+  const [kind, a, b] = data.split(":");
+
+  if (kind === "room") {
+    const r = await getRoom(a);
+    if (r) await setSetting("telegram.room", r.id);
+    await ack(r ? `Notes go to ${r.name}` : "Room not found");
+    return;
+  }
+  if (kind === "fb") {
+    const rating = a as "up" | "down";
+    if (rating === "down") {
+      await setSetting("telegram.await", { kind: "feedback", briefId: b });
+      await ack();
+      await send(chatId, "What should change? One line, for example <i>too long, keep it to five lines</i>.", undefined, messageId);
+      return;
+    }
+    await rateBrief(b, "up");
+    return void (await ack("Thanks. Recorded."));
+  }
+  if (kind === "why") {
+    const brief = await getBrief(a);
+    await ack();
+    if (brief) await send(chatId, receiptsHtml(brief), undefined, messageId);
+    return;
+  }
+  if (kind === "t") {
+    await q(`update candidates set keep = not keep where id = $1 and status = 'proposed'`, [a]);
+    const c = await getCandidate(a);
+    await ack();
+    if (!c) return;
+    const room = await getRoom(c.roomId);
+    if (!room) return;
+    const debriefId = (await q(`select debrief_id from candidates where id = $1`, [a]))[0]?.debrief_id ?? "none";
+    const view = candidatesView(room, await proposedWithKeep(room.id), debriefId);
+    await edit(chatId, messageId, view.html, view.markup);
+    return;
+  }
+  if (kind === "file") {
+    const rows = await q(`select id, keep, room_id from candidates where status = 'proposed' and (debrief_id = $1 or $1 = 'none') order by created_at asc`, [a]);
+    await ack();
+    if (!rows.length) return void (await edit(chatId, messageId, "Already filed."));
+    const room = await getRoom(rows[0].room_id);
+    const jobs = await decide(rows.map((r) => ({ id: r.id, keep: !!r.keep })), { chatId, messageId });
+    await q(`update memory_jobs set notify = $2::jsonb where id = any($1::text[])`, [jobs.map((j) => j.jobId), JSON.stringify({ chatId, messageId, batch: true })]);
+    await renderBatch(chatId, messageId, room?.name ?? "Room", jobs.map((j) => j.jobId));
+  }
+}
+
+async function renderBatch(chatId: number, messageId: number, roomName: string, jobIds: string[]) {
+  const rows = jobIds.length ? await q(`select * from memory_jobs where id = any($1::text[]) order by created_at asc`, [jobIds]) : [];
+  if (!rows.length) return void (await edit(chatId, messageId, `<b>${esc(roomName)}</b> · nothing filed.`));
+  const { toJob } = await import("./memory/keeper.ts");
+  await edit(
+    chatId,
+    messageId,
+    [`<b>${esc(roomName)}</b> · the Keeper is filing ${rows.length} ${rows.length === 1 ? "memory" : "memories"}`, ...rows.map((r) => `• <b>${r.type}</b> · ${esc(r.body)}\n  ${jobLine(toJob(r))}`)].join("\n"),
+  );
+}
+
+/** When the Keeper stores a memory, update the Telegram message that asked for it. */
+export function watchStored() {
+  return subscribe((_, e) => {
+    if (e.type !== "memory.stored" && e.type !== "memory.failed") return;
+    void (async () => {
+      const r = (await q(`select notify, room_id from memory_jobs where id = $1`, [e.job.jobId]))[0];
+      const n = r?.notify as { chatId: number; messageId: number; batch?: boolean } | null;
+      if (!n || !env.telegramToken()) return;
+      if (n.batch) {
+        const ids = (await q(`select id from memory_jobs where notify->>'messageId' = $1 order by created_at asc`, [String(n.messageId)])).map((x) => x.id);
+        const room = r.room_id ? await getRoom(r.room_id) : null;
+        await renderBatch(n.chatId, n.messageId, room?.name ?? "CEO", ids);
+      } else {
+        const room = e.job.roomId ? await getRoom(e.job.roomId) : null;
+        await edit(n.chatId, n.messageId, `<b>${e.job.type}</b> · filed by ${esc(CREW[e.job.agent].name)} in ${esc(room?.name ?? "your preferences")}\n${jobLine(e.job)}`);
+      }
+    })().catch((err) => console.warn(`[telegram] notify: ${(err as Error).message}`));
+  });
+}
+
+export async function handleUpdate(u: any) {
+  try {
+    if (u.message?.text) {
+      await handleText(u.message.chat.id, u.message.message_id, u.message.text, u.message.reply_to_message?.message_id ?? null);
+    } else if (u.callback_query?.data && u.callback_query.message) {
+      await handleCallback(u.callback_query.message.chat.id, u.callback_query.message.message_id, u.callback_query.data, u.callback_query.id);
+    }
+  } catch (e) {
+    console.error(`[telegram] update failed: ${(e as Error).stack ?? e}`);
+    const chat = u.message?.chat?.id ?? u.callback_query?.message?.chat?.id;
+    if (chat) await send(chat, "Something went wrong on our side. The note was not lost if it was already queued; try again in a minute.").catch(() => {});
+  }
+}
+
+let polling = false;
+
+/** Local development: long-poll getUpdates (removes any webhook first). */
+export async function startPolling() {
+  if (polling || !env.telegramToken()) return;
+  polling = true;
+  await tg("deleteWebhook", { drop_pending_updates: false });
+  await tg("setMyCommands", {
+    commands: [
+      { command: "brief", description: "Brief me on the current room now" },
+      { command: "debrief", description: "Start tonight's debrief now" },
+      { command: "rooms", description: "Switch room" },
+      { command: "new", description: "Open a room for a project" },
+      { command: "ask", description: "Ask the room's memory" },
+      { command: "memories", description: "Latest memories in this room" },
+      { command: "crew", description: "Who works here (from Sui)" },
+      { command: "times", description: "Set brief and debrief times" },
+      { command: "web", description: "Open the office" },
+      { command: "help", description: "How to use the crew" },
+    ],
+  }).catch(() => {});
+  let offset = (await getSetting<number>("telegram.offset")) ?? 0;
+  console.log("[telegram] polling for updates");
+  void (async () => {
+    while (polling) {
+      try {
+        const updates = await tg<any[]>("getUpdates", { offset, timeout: 30, allowed_updates: ["message", "callback_query"] });
+        for (const u of updates) {
+          offset = u.update_id + 1;
+          await setSetting("telegram.offset", offset);
+          await handleUpdate(u);
+        }
+      } catch (e) {
+        console.warn(`[telegram] poll: ${(e as Error).message}`);
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+    }
+  })();
+}
+
+export const stopPolling = () => {
+  polling = false;
+};

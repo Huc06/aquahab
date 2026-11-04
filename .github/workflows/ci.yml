@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       web: ${{ steps.filter.outputs.web }}
+      server: ${{ steps.filter.outputs.server }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -25,6 +26,10 @@ jobs:
           filters: |
             web:
               - 'web/**'
+              - '.github/workflows/ci.yml'
+            server:
+              - 'server/**'
+              - 'web/src/lib/api-types.ts'
               - '.github/workflows/ci.yml'
 
   web:
@@ -47,19 +52,48 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
 
+  server:
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: server/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      # Typecheck, then the full daily loop against the SDK's MemWalMock (no network, no secrets).
+      - run: pnpm check
+      # The web app's api-types.ts must be the generated copy of server/src/contract.ts.
+      - run: node scripts/sync-contract.mjs --check
+
   # Required check. Skipped jobs report "skipped", so this gate decides the result, not the per-area jobs.
   ci:
-    needs: [changes, web]
+    needs: [changes, web, server]
     if: always()
     runs-on: ubuntu-latest
     env:
       WEB_CHANGED: ${{ needs.changes.outputs.web }}
       WEB_RESULT: ${{ needs.web.result }}
+      SERVER_CHANGED: ${{ needs.changes.outputs.server }}
+      SERVER_RESULT: ${{ needs.server.result }}
     steps:
       - name: Check results
         run: |
           if [ "$WEB_CHANGED" = "true" ] && [ "$WEB_RESULT" != "success" ]; then
             echo "web job result: $WEB_RESULT"
+            exit 1
+          fi
+          if [ "$SERVER_CHANGED" = "true" ] && [ "$SERVER_RESULT" != "success" ]; then
+            echo "server job result: $SERVER_RESULT"
             exit 1
           fi
           echo "CI passed"

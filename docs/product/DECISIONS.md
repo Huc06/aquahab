@@ -138,3 +138,25 @@ Character names stay as in PRODUCT_CONCEPT. Role titles are chosen so that all t
 Known trade-off: "Head of" implies management. Agents are staff, so UI copy must not suggest that agents manage people.
 
 Internal IDs (`one`, `researcher`, `builder`, `lofi`, `hippo`) and the `AgentRole` enum in DATA_MODEL.md are unchanged. Only display text changes.
+
+## 11. Total Recall refinement, v3.0 (2026-11-03), proposed for the product owner
+
+Proposed by the backend owner with the backend PR. It overrides §1–§10 where they conflict once the product owner accepts it. Rationale and sources: the "Make Aquahab the crew that remembers" refinement brief shared on 2026-11-02.
+
+**The job.** Aquahab is a 3D office whose crew remembers where you left off on each of your real projects. The "CEO runs a company of AI agents" framing stays as the presentation, not the job.
+
+1. **Rooms replace missions.** Each real project is a room, and each room is exactly one Walrus Memory namespace, `aquahab:room:<slug>` (an HMAC alias for a private project, because namespace names are public in Blob metadata). One more namespace, `aquahab:ceo`, holds the CEO's preferences and feedback across rooms.
+2. **Scheduled agents move from Phase 2 into the MVP.** They are the core loop:
+   - a morning brief at the CEO's time (Telegram and app), one section per crew member, every line citing the Walrus blob ids it came from;
+   - an evening debrief: the crew asks how the day went, proposes memories, and files only the ones the CEO keeps (the PR #2 review panel is this approval step);
+   - quick capture at any time: `d:` decision, `f:` failure, `n:` next, `done:`, `l:` learned, `due:` deadline, `s:` story, `p:` preference.
+3. **Employees are delegate keys.** One, Researcher, Builder, Lofi, Hippo and the Walrus Keeper are each an Ed25519 delegate key on the Aquahab MemWalAccount, labelled with their name on-chain. Hiring is `add_delegate_key`, firing is `remove_delegate_key`, signed by the CEO (the account owner). This replaces "only the orchestrator calls remember" (§3): the **Keeper is the only write path**, but each memory is signed by the key of the member who files it, so authorship is on-chain (`memwal_agent_id` in Blob metadata).
+4. **Memory types live in the memory text** (`[type][room][date][by:agent] …`), because recall has no tag filters. Types and filers: decision, next → One; failure, done → Builder; learned → Researcher; deadline → Hippo; story → Lofi; preference, feedback → Keeper.
+5. **The office is drawn from Sui through Tatum.** Who works here (the MemWalAccount's delegate keys), the hire/fire history (DelegateKeyAdded/Removed events), which memories exist and who filed each one (Walrus Blob objects and their metadata) are read through Tatum's Sui gateway (native gRPC and GraphQL). Tatum moves from Phase 2 (§8.4 palette aside) into the MVP, because it is named in criteria worth 60% of the score.
+6. **Mainnet only for the submission.** The SDK's in-memory mock (`MEMORY_MODE=mock`) exists for UI development and tests; the server refuses to start with it in production.
+7. **LLM:** one provider through the Vercel AI SDK and AI Gateway (Claude Sonnet for briefs and debriefs, Claude Haiku for classification), with deterministic fallbacks so the loop never stops. Tatum is not an LLM provider.
+8. **Cut from the MVP:** missions with budgets and governance, manual renewal (the SDK has no renew; live memories are stored for 15 Walrus epochs, about 30 weeks), Aqua City, Ask the Vault (`/ask` over recall covers it), the separate Company Briefing (the morning brief replaces it), Agent Payments.
+9. **Supersede, never forget.** The TS SDK has no `forget()`, and the REST forget clears a whole namespace. A correction is a newer memory tagged `[supersedes:<blob_id>]`.
+10. **One CEO per deployment.** The office is public to read (judges see the real rooms, crew and receipts). Writes need the CEO session, opened from the Telegram bot's `/web` link.
+
+Display names and role titles from §10 are unchanged. Internal ids add `keeper`.
