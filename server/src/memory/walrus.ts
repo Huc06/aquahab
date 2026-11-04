@@ -46,6 +46,9 @@ export function clientFor(role: Role): { client: Client; signer: Role } {
       accountId: env.accountId(),
       serverUrl: env.relayerUrl(),
       recallTimeoutMs: 20_000,
+      // The SDK's 5 s default for /version, /health and /config is too tight on a slow resolver
+      // (2.5–6 s seen from Vietnam), which failed whole remember/recall calls in preflight.
+      preflightTimeoutMs: 15_000,
     });
     clients.set(signer, c);
   }
@@ -179,7 +182,7 @@ async function ledgerListing(namespace: string | null): Promise<MemorySummary[]>
 export async function relayerHealth(): Promise<{ status: "ok" | "down"; writes: "ok" | "degraded" | "paused"; version: string | null }> {
   try {
     const { client } = clientFor("keeper");
-    const h = await withTimeout(client.health(), 8_000, "health");
+    const h = await withTimeout(client.health(), 20_000, "health");
     const writes = h.write_ready === false ? "paused" : h.status === "ok" ? "ok" : "degraded";
     return { status: h.status === "ok" ? "ok" : "down", writes, version: h.version ?? null };
   } catch {

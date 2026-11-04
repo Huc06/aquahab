@@ -27,6 +27,8 @@ async function tg<T = any>(method: string, body: Record<string, unknown>): Promi
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
+    // A half-open socket after a network drop would otherwise stall the poll loop.
+    signal: AbortSignal.timeout(method === "getUpdates" ? ((body.timeout as number) ?? 0) * 1000 + 15_000 : 20_000),
   });
   const j: any = await r.json();
   if (!j.ok && !/message is not modified/.test(j.description ?? "")) throw new Error(`telegram ${method}: ${j.description}`);
