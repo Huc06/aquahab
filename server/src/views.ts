@@ -23,7 +23,7 @@ import { env } from "./env.ts";
 import { cached, q } from "./db.ts";
 import { blobMetadata, chainInfo, delegateKeyEvents, lastWrite, memwalAccount, ownedMemories, type ChainAccount, type ChainMemory } from "./chain/sui.ts";
 import { TatumUnavailable } from "./chain/tatum.ts";
-import { isMock, listAll, listNamespace, relayerHealth } from "./memory/walrus.ts";
+import { isMock, listAll, listNamespace, recall, relayerHealth } from "./memory/walrus.ts";
 import { queueCounts } from "./memory/keeper.ts";
 import { parseMemory } from "./memory/format.ts";
 import { llmStatus } from "./llm.ts";
@@ -194,8 +194,16 @@ export async function memoriesView(room: Pick<Room, "id" | "namespace">): Promis
     const [listed, crew, index] = await Promise.all([listNamespace(room.namespace), crewView(), chainIndex()]);
     const ids = listed.map((m) => m.blob_id);
     const texts = new Map<string, string>();
-    if (ids.length) {
+    const loadTexts = async () => {
+      if (!ids.length) return;
       for (const r of await q(`select blob_id, text from memory_texts where blob_id = any($1::text[])`, [ids])) texts.set(r.blob_id, r.text);
+    };
+    await loadTexts();
+    // listMemories carries no text. On a fresh database (a new machine, a new deploy) or for a write made
+    // outside the Keeper (Claude Code), recall the room once: recall() stores every hit's text.
+    if (ids.some((id) => !texts.has(id))) {
+      await recall({ namespace: room.namespace, query: "project memory: decisions, failures, next steps, deadlines", sort: "recent", limit: Math.min(100, ids.length * 2), purpose: "wall", roomId: room.id, as: "keeper" });
+      await loadTexts();
     }
     const labelOf = new Map(crew.agents.map((a) => [a.publicKey, a.label]));
     const memories: Memory[] = listed.map((m) => {
