@@ -15,6 +15,9 @@ interface HQState {
   /** The room the CEO is looking at. null means "the first room". */
   roomId: string | null;
   setRoomId: (id: string | null) => void;
+  /** Bumped when the room list changes, so every useActiveRoom() refetches. */
+  roomsVersion: number;
+  roomsChanged: () => void;
   chatOpen: boolean;
   setChatOpen: (open: boolean) => void;
   musicOn: boolean;
@@ -30,6 +33,8 @@ export const useHQ = create<HQState>((set) => ({
   setDrawer: (kind) => set({ drawer: kind }),
   roomId: null,
   setRoomId: (id) => set({ roomId: id }),
+  roomsVersion: 0,
+  roomsChanged: () => set((s) => ({ roomsVersion: s.roomsVersion + 1 })),
   chatOpen: false,
   setChatOpen: (open) => set({ chatOpen: open }),
   musicOn: false,

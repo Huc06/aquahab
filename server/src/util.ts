@@ -90,6 +90,7 @@ export function dayIndex(startLocalDate: string, todayLocalDate: string): number
 export function slugify(s: string): string {
   return s
     .toLowerCase()
+    .replace(/đ/g, "d") // Vietnamese đ has no NFKD decomposition
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
