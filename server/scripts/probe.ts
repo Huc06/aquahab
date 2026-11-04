@@ -1,5 +1,6 @@
 // pnpm probe: the Day-1 checks against mainnet, read-only. Writes docs/FACTS.md with what was observed.
 // Nothing here writes a memory or a transaction.
+import "../src/net.ts"; // first: outbound HTTP settings
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { MemWal } from "@mysten-incubation/memwal";

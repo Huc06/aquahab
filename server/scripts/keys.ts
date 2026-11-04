@@ -1,5 +1,6 @@
 // pnpm keys: generate the Aquahab account owner (a new Sui address) and one Ed25519 delegate key per crew
 // member. Existing keys are never overwritten. Prints only public values.
+import "../src/net.ts"; // first: outbound HTTP settings
 import { randomBytes } from "node:crypto";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { generateDelegateKey } from "@mysten-incubation/memwal/account";

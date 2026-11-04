@@ -1,6 +1,7 @@
 // pnpm verify: prove every Aquahab memory exists on Walrus mainnet, independently of this server.
 // Lists memories from the relayer, reads the owner's Blob objects from Sui through Tatum (with each Blob's
 // on-chain namespace and author), matches them by blob id, and writes docs/PROOF.md.
+import "../src/net.ts"; // first: outbound HTTP settings
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { MemWal } from "@mysten-incubation/memwal";

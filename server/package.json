@@ -21,6 +21,7 @@
     "contract:sync": "node scripts/sync-contract.mjs"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.84",
     "@electric-sql/pglite": "^0.5.15",
     "@grpc/grpc-js": "^1.14.7",
     "@grpc/proto-loader": "^0.8.1",
@@ -32,6 +33,7 @@
     "@protobuf-ts/grpc-transport": "2.11.1",
     "ai": "^7.0.162",
     "hono": "^4.13.16",
+    "undici": "^8.12.3",
     "zod": "^4.6.7"
   },
   "devDependencies": {

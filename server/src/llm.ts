@@ -2,15 +2,34 @@
 // cite: memories are passed as short codes (m1, m2…), the model cites codes, and the server maps codes back
 // to Walrus blob ids and drops any line whose citations are not in the recall set.
 // Every call has a deterministic fallback, so a missing key or an outage degrades the brief, never the loop.
-import { generateText, Output } from "ai";
+import { generateText, Output, type LanguageModel } from "ai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { z } from "zod";
 import { MEMORY_TYPES, type MemoryType, type Role } from "./contract.ts";
 import { env } from "./env.ts";
 import { guessType, parseMemory } from "./memory/format.ts";
 
 export function llmStatus(): { ok: boolean; model: string | null } {
-  return { ok: env.llmEnabled(), model: env.llmEnabled() ? env.llmModel() : null };
+  return { ok: env.llmEnabled(), model: env.llmEnabled() ? `${env.llmProvider()}:${env.llmModel()}` : null };
 }
+
+let compatible: ReturnType<typeof createOpenAICompatible> | null = null;
+
+/** The model for a job: "main" writes briefs and debrief proposals, "fast" classifies and answers. */
+function lm(kind: "main" | "fast"): LanguageModel {
+  const id = kind === "main" ? env.llmModel() : env.llmFastModel();
+  if (env.llmProvider() === "gateway") return id; // AI Gateway is the AI SDK's default provider for "provider/model" ids
+  compatible ??= createOpenAICompatible({
+    name: env.llmProvider() === "ollama" ? "ollama" : "llm",
+    baseURL: env.llmBaseUrl(),
+    apiKey: env.llmApiKey(),
+    supportsStructuredOutputs: true,
+  });
+  return compatible(id);
+}
+
+/** Local open-weight models on a laptop CPU are several times slower than a hosted API. */
+const patience = (ms: number) => AbortSignal.timeout(env.llmProvider() === "ollama" ? ms * 4 : ms);
 
 const STYLE = `Write plain, concrete English. Short lines. No filler, no emojis, no em dashes, no hype.
 Never invent facts, names, dates or numbers that are not in the memories.`;
@@ -83,13 +102,13 @@ export async function composeBrief(input: BriefInput): Promise<BriefDraft> {
         ...(input.ceo.length ? input.ceo.map((m) => `${m.code} ${m.text}`) : ["(none yet)"]),
       ].join("\n");
       const { output } = await generateText({
-        model: env.llmModel(),
+        model: lm("main"),
         system: BRIEF_SYSTEM,
         prompt,
         output: Output.object({ schema: BriefSchema }),
-        abortSignal: AbortSignal.timeout(60_000),
+        abortSignal: patience(60_000),
       });
-      return { sections: output.sections, source: "llm", model: env.llmModel() };
+      return { sections: output.sections, source: "llm", model: `${env.llmProvider()}:${env.llmModel()}` };
     } catch (e) {
       console.warn(`[llm] brief fell back: ${(e as Error).message}`);
     }
@@ -160,7 +179,7 @@ export async function extractCandidates(note: string, roomName: string, existing
   if (env.llmEnabled()) {
     try {
       const { output } = await generateText({
-        model: env.llmModel(),
+        model: lm("main"),
         system: DEBRIEF_SYSTEM,
         prompt: [
           `Project: ${roomName}`,
@@ -171,7 +190,7 @@ export async function extractCandidates(note: string, roomName: string, existing
           note,
         ].join("\n"),
         output: Output.object({ schema: CandidateSchema }),
-        abortSignal: AbortSignal.timeout(45_000),
+        abortSignal: patience(45_000),
       });
       return output.candidates.filter((c) => c.text.trim());
     } catch (e) {
@@ -198,11 +217,11 @@ export async function classifyCapture(text: string): Promise<MemoryType> {
   if (env.llmEnabled()) {
     try {
       const { output } = await generateText({
-        model: env.llmFastModel(),
+        model: lm("fast"),
         system: `Classify the CEO's note about a project into one memory type: decision, failure, done, next, learned, deadline, story or preference. Pick the single best fit.`,
         prompt: text,
         output: Output.object({ schema: TypeSchema }),
-        abortSignal: AbortSignal.timeout(20_000),
+        abortSignal: patience(20_000),
       });
       return output.type;
     } catch (e) {
@@ -221,11 +240,11 @@ export async function answerFromMemory(question: string, roomName: string, memor
   if (env.llmEnabled()) {
     try {
       const { output } = await generateText({
-        model: env.llmFastModel(),
+        model: lm("fast"),
         system: `Answer the CEO's question about the project "${roomName}" in at most 3 short sentences, using only the memories given. Cite the codes you used. If the memories do not answer it, say "Not in memory yet." ${STYLE}`,
         prompt: [...memories.map((m) => `${m.code} ${m.text}`), "", `Question: ${question}`].join("\n"),
         output: Output.object({ schema: AnswerSchema }),
-        abortSignal: AbortSignal.timeout(30_000),
+        abortSignal: patience(30_000),
       });
       return output;
     } catch (e) {

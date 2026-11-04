@@ -36,7 +36,7 @@ let running = false;
 export async function tick(now = new Date()): Promise<TickResult> {
   const t0 = Date.now();
   const out: TickResult = { memory: { submitted: 0, stored: 0, failed: 0, rateLimited: false }, briefs: [], debriefs: [], errors: [], ms: 0 };
-  if (running) return { ...out, errors: ["tick already running"] };
+  if (running) return out; // the previous tick is still writing; this one has nothing to add
   running = true;
   try {
     try {

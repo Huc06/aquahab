@@ -28,9 +28,23 @@ export const env = {
   /** Delegate private key (hex) of one crew member, or undefined when that member is not hired yet. */
   roleKey: (role: Role) => read(`MEMWAL_KEY_${role.toUpperCase()}`),
   tatumKey: () => read("TATUM_API_KEY"),
-  llmModel: () => read("LLM_MODEL") ?? "anthropic/claude-sonnet-5.5",
-  llmFastModel: () => read("LLM_FAST_MODEL") ?? "anthropic/claude-haiku-5.5",
-  llmEnabled: () => !!(read("AI_GATEWAY_API_KEY") || read("VERCEL_OIDC_TOKEN")),
+  /**
+   * Where the crew's model runs (same choice as Tact):
+   *   ollama             an open-weight model on this machine, no key (LLM_BASE_URL defaults to Ollama's /v1)
+   *   openai-compatible  any OpenAI-compatible API: Groq, OpenRouter, Gemini, LM Studio (LLM_BASE_URL + LLM_API_KEY)
+   *   gateway            Vercel AI Gateway (AI_GATEWAY_API_KEY)
+   *   off                deterministic fallbacks only
+   */
+  llmProvider: (): "ollama" | "openai-compatible" | "gateway" | "off" => {
+    const p = read("LLM_PROVIDER");
+    if (p === "ollama" || p === "openai-compatible" || p === "gateway" || p === "off") return p;
+    return read("AI_GATEWAY_API_KEY") || read("VERCEL_OIDC_TOKEN") ? "gateway" : "off";
+  },
+  llmBaseUrl: () => read("LLM_BASE_URL") ?? "http://localhost:11434/v1",
+  llmApiKey: () => read("LLM_API_KEY"),
+  llmModel: () => read("LLM_MODEL") ?? (env.llmProvider() === "gateway" ? "anthropic/claude-sonnet-5.5" : "llama3.1:8b"),
+  llmFastModel: () => read("LLM_FAST_MODEL") ?? (env.llmProvider() === "gateway" ? "anthropic/claude-haiku-5.5" : env.llmModel()),
+  llmEnabled: () => env.llmProvider() !== "off",
   telegramToken: () => read("TELEGRAM_BOT_TOKEN"),
   telegramMode: (): "poll" | "webhook" | "off" => {
     const m = read("TELEGRAM_MODE");

@@ -10,6 +10,7 @@
 //   hire-contractor <label> <publicKeyHex>   register an outside key (e.g. a Claude Code plugin key)
 //
 // Add --direct to use Mysten's public fullnode instead of Tatum.
+import "../src/net.ts"; // first: outbound HTTP settings
 import { addDelegateKey, createAccount, removeDelegateKey } from "@mysten-incubation/memwal/account";
 import { delegateKeyToPublicKey } from "@mysten-incubation/memwal";
 import { CREW, ROLES, suiscanObject, suiscanTx, type Role } from "../src/contract.ts";

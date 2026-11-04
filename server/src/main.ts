@@ -1,4 +1,5 @@
 // Long-lived entry point: HTTP API + scheduler + Telegram, in one process.
+import "./net.ts"; // first: outbound HTTP settings
 import { serve } from "@hono/node-server";
 import { app } from "./app.ts";
 import { env } from "./env.ts";
@@ -22,5 +23,5 @@ serve({ fetch: app.fetch, port: env.port() }, (info) => {
   console.log(`Aquahab crew server on http://localhost:${info.port}`);
   console.log(`  memory: ${isMock() ? "MOCK (in-memory, nothing reaches Walrus)" : `mainnet via ${env.relayerUrl()}`}`);
   console.log(`  crew keys: ${hiredRoles().join(", ") || "none (run pnpm keys)"}`);
-  console.log(`  tatum: ${env.tatumKey() ? "key set" : "no key"} · llm: ${env.llmEnabled() ? env.llmModel() : "off (fallbacks)"} · telegram: ${env.telegramMode()}`);
+  console.log(`  tatum: ${env.tatumKey() ? "key set" : "no key"} · llm: ${env.llmEnabled() ? `${env.llmProvider()} ${env.llmModel()}` : "off (fallbacks)"} · telegram: ${env.telegramMode()}`);
 });

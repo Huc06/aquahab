@@ -20,3 +20,5 @@ the Total Recall feedback fields and for anyone building the same stack.
 | 13 | `delegateKeyToPublicKey` is async in 0.1.12 | SDK | Awaited everywhere |
 | 14 | Relayer blob ids are base64url; the on-chain Blob stores a little-endian u256; event public keys are base64 while Agent IDs are hex | relayer × Sui | Conversions in `server/src/util.ts` and `server/src/chain/sui.ts` |
 | 15 | `remember()` returns 202 and confirmation takes tens of seconds | relayer ([#1165](https://github.com/MystenLabs/walrus-memory/issues/1165)) | Never block a request: queue, poll status in the scheduler, push `memory.stored` over SSE |
+| 16 | A delegate key added on-chain minutes earlier was refused once by the relayer (HTTP 404 on `remember`), then accepted on retry | relayer (seen 2026-11-04, Builder's first write) | The Keeper's backoff retries with the same idempotency key |
+| 17 | Node's fetch gives up connecting after 10 s (undici default); on a slow resolver every relayer call failed with `UND_ERR_CONNECT_TIMEOUT` while curl worked | Node 22+ | `server/src/net.ts` raises the connect timeout to 30 s for the whole process |
