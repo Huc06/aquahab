@@ -1,7 +1,7 @@
 // Rooms: one real project each, and exactly one Walrus Memory namespace each.
 // Namespace names are public on-chain (the relayer writes `memwal_namespace` into each Blob's metadata),
 // so a private room gets an HMAC alias instead of its slug.
-import type { CreateRoomRequest, Room, UpdateRoomRequest } from "./contract.ts";
+import { CONTEXT_TAG_MAX, ROLES, type ContextTags, type CreateRoomRequest, type Room, type UpdateRoomRequest } from "./contract.ts";
 import { env } from "./env.ts";
 import { one, q } from "./db.ts";
 import { dayIndex, hmac, isHHMM, localParts, newId, slugify } from "./util.ts";
@@ -31,7 +31,19 @@ function toRoom(r: Record<string, any>, memoryCount: number, lastBriefAt: string
     lastBriefAt,
     createdAt: new Date(r.created_at).toISOString(),
     dayIndex: dayIndex(r.start_date, localParts(new Date(), tz).date),
+    contextTags: r.context_tags && Object.keys(r.context_tags).length ? (r.context_tags as ContextTags) : null,
   };
+}
+
+/** Keep known crew roles with a non-empty label, trimmed to CONTEXT_TAG_MAX. null when nothing is left. */
+export function cleanContextTags(tags: unknown): ContextTags | null {
+  if (!tags || typeof tags !== "object" || Array.isArray(tags)) return null;
+  const out: ContextTags = {};
+  for (const role of ROLES) {
+    const v = (tags as Record<string, unknown>)[role];
+    if (typeof v === "string" && v.trim()) out[role] = v.replace(/\s+/g, " ").trim().slice(0, CONTEXT_TAG_MAX);
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 const ROOM_STATS = `
@@ -60,7 +72,8 @@ export async function createRoom(req: CreateRoomRequest): Promise<Room> {
   if (await one(`select id from rooms where slug = $1`, [slug])) throw new RoomError(`Room '${slug}' already exists.`);
   const id = newId("room");
   const goal = req.goal?.trim().slice(0, 280) || null;
-  await q(`insert into rooms (id, slug, name, namespace, private, brief_at, debrief_at, start_date, goal) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [
+  const tags = cleanContextTags(req.contextTags);
+  await q(`insert into rooms (id, slug, name, namespace, private, brief_at, debrief_at, start_date, goal, context_tags) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)`, [
     id,
     slug,
     name,
@@ -70,6 +83,7 @@ export async function createRoom(req: CreateRoomRequest): Promise<Room> {
     debriefAt,
     localParts(new Date(), env.timezone()).date,
     goal,
+    tags ? JSON.stringify(tags) : null,
   ]);
   return (await getRoom(id))!;
 }
@@ -85,6 +99,15 @@ export async function updateRoom(id: string, req: UpdateRoomRequest): Promise<Ro
     req.briefAt ?? null,
     req.debriefAt ?? null,
   ]);
+  // Goal and tags can be cleared, so "absent" (keep) and "empty" (clear) differ.
+  if (req.goal !== undefined) {
+    const goal = typeof req.goal === "string" ? req.goal.trim().slice(0, 280) : "";
+    await q(`update rooms set goal = $2 where id = $1`, [room.id, goal || null]);
+  }
+  if (req.contextTags !== undefined) {
+    const tags = cleanContextTags(req.contextTags);
+    await q(`update rooms set context_tags = $2::jsonb where id = $1`, [room.id, tags ? JSON.stringify(tags) : null]);
+  }
   return (await getRoom(room.id))!;
 }
 

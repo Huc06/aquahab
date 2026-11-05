@@ -81,6 +81,7 @@ in-memory `MemWalMock`; the server refuses both flags when `NODE_ENV=production`
 | `pnpm account status \| create \| hire-all \| hire <role> \| fire <role> \| hire-contractor <label> <pubkey>` | the payroll desk, signed by the owner key, submitted through Tatum (`--direct` for Mysten's fullnode) |
 | `pnpm probe` | read-only mainnet checks → `docs/FACTS.md` |
 | `pnpm verify` | every memory on the relayer matched to its Blob object on Sui (namespace and author from Blob metadata) → `docs/PROOF.md` |
+| `pnpm seed-room <slug> <file> [--api <url>] [--dry-run]` | file prepared memories (one prefixed line each) through the normal capture path; real mainnet writes, so true lines only |
 | `pnpm db:copy` | one-time cut-over: copy the local PGlite ledger (rooms, briefs, board, pairing) into `DATABASE_URL` |
 | `pnpm contract:sync` | copy `src/contract.ts` to `web/src/lib/api-types.ts` (CI checks they match) |
 
@@ -92,12 +93,14 @@ Shapes: [`src/contract.ts`](src/contract.ts). Reads are public; writes (✱) nee
 |---|---|
 | `GET /api/health` | relayer (writes ok/paused), Tatum (epoch, checkpoint), LLM, queue counts, mock or mainnet |
 | `GET /api/session` | `{ ceo }` |
-| `GET /api/rooms` · `POST /api/rooms` ✱ · `GET/PATCH ✱ /api/rooms/:id` | rooms (one namespace each) |
+| `GET /api/rooms` · `POST /api/rooms` ✱ · `GET/PATCH ✱ /api/rooms/:id` | rooms (one namespace each), with an optional goal and `contextTags` (a label per crew member; `CONTEXT_PRESETS.creator`) |
 | `GET /api/rooms/:id/brief/latest` · `GET …/briefs` · `POST …/brief` ✱ | briefs with per-line `cites` (blob ids) |
 | `POST /api/briefs/:id/feedback` ✱ | `{ rating: "up"\|"down", reason? }` → feedback memory |
 | `POST /api/rooms/:id/capture` ✱ | `{ text }` with a quick-capture prefix, or free text (classified) → `MemoryJob` |
 | `POST /api/rooms/:id/debrief` ✱ · `GET …/candidates` · `POST /api/candidates/decide` ✱ | proposals, then keep/drop/edit → `MemoryJob[]` |
 | `GET /api/memory-jobs/:jobId` · `GET /api/memory-jobs?roomId=` · `POST …/retry` ✱ | `queued → pending → stored` (or `failed`) with `blobId` |
+| `POST /api/rooms/:id/draft` ✱ | `{ idea, agent?, refine?, previous? }` → a draft in the room's voice plus the memories it followed or avoided (blob ids). Stores nothing |
+| `POST /api/rooms/:id/chat` ✱ | `{ message, agent: role | "all" }` → replies from the members with relevant memories, each citing blob ids, plus an optional proposal to commit through `/capture`. Stores nothing |
 | `GET /api/rooms/:id/memories` | the room wall: relayer listing joined with Sui (Blob object, end epoch, on-chain author) |
 | `GET /api/rooms/:id/recall?q=` | search the room's memory |
 | `GET /api/memories/:blobId/receipt` | one memory's on-chain receipt via Tatum: Blob object, namespace, write tx, checkpoint |

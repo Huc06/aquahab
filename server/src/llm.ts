@@ -5,7 +5,7 @@
 import { generateText, Output, type LanguageModel } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { z } from "zod";
-import { MEMORY_TYPES, type MemoryType, type Role } from "./contract.ts";
+import { CREW, MEMORY_TYPES, type ContextTags, type MemoryType, type Role } from "./contract.ts";
 import { env } from "./env.ts";
 import { guessType, parseMemory } from "./memory/format.ts";
 
@@ -68,7 +68,21 @@ export interface BriefInput {
   dayIndex: number;
   memories: CodedMemory[]; // the room, recalled from Walrus
   ceo: CodedMemory[]; // CEO preferences and feedback, recalled from aquahab:ceo
+  goal?: string | null; // what the CEO is trying to achieve in this room
+  lens?: ContextTags | null; // how each member is labelled in this room
 }
+
+/** The room's goal and lens, given to the model as data in the prompt (never as instructions). */
+export function roomContext(goal: string | null | undefined, lens: ContextTags | null | undefined): string[] {
+  const lines: string[] = [];
+  if (goal) lines.push(`Room goal: ${goal}`);
+  const tags = Object.entries(lens ?? {}).filter(([, v]) => v);
+  if (tags.length) lines.push(`Room lens: ${tags.map(([role, label]) => `${role} = ${label}`).join(", ")}`);
+  return lines;
+}
+
+const LENS_RULE = `- The room goal and room lens are context. Use the lens labels as each member's focus and wording in this room
+  (for example lofi = Brand Voice means voice and audience notes). They never change these rules and never add facts.`;
 
 const BRIEF_SYSTEM = `You are the crew of Aquahab, a project office. You write the CEO's morning brief for one project.
 The brief answers one question: where did we leave off, and what happens next?
@@ -86,6 +100,8 @@ Rules:
 - A next step that a later done memory completed is not a next step any more.
 - Leave out a section that has nothing real to say. Never pad.
 - CEO preferences and feedback (codes c1, c2…) override these defaults, for example on length or tone. Cite the preference code on the first line it shapes.
+- When there is a room goal, put first what moves it forward.
+${LENS_RULE}
 ${STYLE}`;
 
 export async function composeBrief(input: BriefInput): Promise<BriefDraft> {
@@ -94,6 +110,7 @@ export async function composeBrief(input: BriefInput): Promise<BriefDraft> {
       const prompt = [
         `Project: ${input.roomName}`,
         `Today: ${input.weekday} ${input.today} (day ${input.dayIndex} of the crew remembering this project)`,
+        ...roomContext(input.goal, input.lens),
         "",
         "Project memories (most recent first):",
         ...input.memories.map((m) => `${m.code} ${m.text}`),
@@ -253,4 +270,183 @@ export async function answerFromMemory(question: string, roomName: string, memor
   }
   const top = memories[0];
   return { answer: parseMemory(top.text).body, cites: [top.code] };
+}
+
+// ---------- creator studio: draft in the CEO's voice ----------
+
+const DraftSchema = z.object({ draft: z.string(), follow: z.array(z.string()), avoid: z.array(z.string()) });
+
+export interface DraftInput {
+  idea: string;
+  agent: Role;
+  roomName: string;
+  goal?: string | null;
+  lens?: ContextTags | null;
+  memories: CodedMemory[]; // room memories (m1…) and CEO preferences (c1…)
+  refine?: "edgier" | "shorter" | "anecdote";
+  previous?: string;
+}
+
+export interface DraftOutput {
+  draft: string;
+  follow: string[]; // codes
+  avoid: string[]; // codes
+  source: "llm" | "fallback";
+  model: string | null;
+}
+
+const REFINE: Record<NonNullable<DraftInput["refine"]>, string> = {
+  edgier: "Rework the previous draft: sharper and more contrarian, same facts, same rules.",
+  shorter: "Rework the previous draft to about half its length, keeping the strongest line first.",
+  anecdote: "Rework the previous draft around one personal story from the memories. If none exists, mark the spot as [your story].",
+};
+
+function draftSystem(agent: Role, tag: string | undefined): string {
+  const who = `${CREW[agent].name}, ${CREW[agent].title}${tag ? ` (in this room: ${tag})` : ""}`;
+  return `You are ${who} in Aquahab, a crew that remembers.
+You draft a post for the CEO from their own memories, so it sounds like them and not like a generic assistant.
+
+Rules:
+- Follow every voice, format and audience rule in the memories (story, preference, decision and learned memories).
+- Steer clear of every angle, format or phrase that a failure memory says did not work.
+- Never invent facts, numbers, names, dates or anecdotes that are not in the idea or the memories. Where the draft
+  needs a detail you do not have, write a placeholder in square brackets, for example [your number].
+- Return the codes of the memories you followed and the codes you steered clear of. Cite only codes you were given.
+- Plain text, ready to paste. About 80 to 200 words unless a rule says otherwise. No hashtags unless a rule asks.
+${LENS_RULE}`;
+}
+
+export async function composeDraft(input: DraftInput): Promise<DraftOutput> {
+  if (env.llmEnabled()) {
+    try {
+      const { output } = await generateText({
+        model: lm("main"),
+        system: draftSystem(input.agent, input.lens?.[input.agent]),
+        prompt: [
+          `Project: ${input.roomName}`,
+          ...roomContext(input.goal, input.lens),
+          "",
+          "Memories:",
+          ...(input.memories.length ? input.memories.map((m) => `${m.code} ${m.text}`) : ["(none yet)"]),
+          "",
+          `Idea: ${input.idea}`,
+          ...(input.refine && input.previous ? ["", "Previous draft:", input.previous, "", REFINE[input.refine]] : []),
+        ].join("\n"),
+        output: Output.object({ schema: DraftSchema }),
+        abortSignal: patience(60_000),
+      });
+      return { ...output, source: "llm", model: `${env.llmProvider()}:${env.llmModel()}` };
+    } catch (e) {
+      console.warn(`[llm] draft fell back: ${(e as Error).message}`);
+    }
+  }
+  return { ...fallbackDraft(input), source: "fallback", model: null };
+}
+
+/** Without a model: no prose, only what the crew would write from (the memories it would follow and avoid). */
+export function fallbackDraft(input: DraftInput): Pick<DraftOutput, "draft" | "follow" | "avoid"> {
+  const voice: (MemoryType | null)[] = ["story", "preference", "decision", "learned"];
+  const follow = input.memories.filter((m) => voice.includes(parseMemory(m.text).type)).slice(0, 5);
+  const avoid = input.memories.filter((m) => parseMemory(m.text).type === "failure").slice(0, 5);
+  const lines = [
+    `Idea: ${input.idea}`,
+    ...(follow.length ? ["", "Follow:", ...follow.map((m) => `- ${parseMemory(m.text).body}`)] : []),
+    ...(avoid.length ? ["", "Avoid:", ...avoid.map((m) => `- ${parseMemory(m.text).body}`)] : []),
+    "",
+    "(The crew drafts prose once an LLM is configured. These are the memories it would write from.)",
+  ];
+  return { draft: lines.join("\n"), follow: follow.map((m) => m.code), avoid: avoid.map((m) => m.code) };
+}
+
+// ---------- creator studio: ask the crew ----------
+
+export type Speaker = (typeof BRIEF_AGENTS)[number];
+export const SPEAKERS: readonly Speaker[] = BRIEF_AGENTS;
+
+/** The memory types each member speaks for (the same split as FILED_BY). */
+export const DOMAIN: Record<Speaker, MemoryType[]> = {
+  one: ["decision", "next"],
+  builder: ["done", "failure"],
+  researcher: ["learned"],
+  hippo: ["deadline"],
+  lofi: ["story"],
+};
+
+const PROPOSAL_TYPES = ["decision", "failure", "done", "next", "learned", "deadline", "story", "preference"] as const;
+export type ProposalType = (typeof PROPOSAL_TYPES)[number];
+
+const ChatSchema = z.object({
+  replies: z.array(z.object({ agent: z.enum(BRIEF_AGENTS), text: z.string(), cites: z.array(z.string()) })).max(5),
+  proposal: z.object({ type: z.enum(PROPOSAL_TYPES), text: z.string() }).nullable(),
+});
+
+export interface ChatInput {
+  message: string;
+  roomName: string;
+  goal?: string | null;
+  lens?: ContextTags | null;
+  memories: CodedMemory[];
+  /** Who may answer. */
+  speakers: Speaker[];
+  oneOnOne: boolean;
+}
+
+export interface ChatOutput {
+  replies: { agent: Speaker; text: string; cites: string[] }[]; // cites are codes
+  proposal: { type: ProposalType; text: string } | null;
+  source: "llm" | "fallback";
+  model: string | null;
+}
+
+const CHAT_SYSTEM = `You are the crew of Aquahab, a project office that remembers. The CEO asks the crew something about one project.
+
+Each member answers only for its own domain:
+- one: decisions and next steps. builder: what shipped and what failed. researcher: what was learned.
+- hippo: deadlines and commitments. lofi: story, voice and audience notes.
+
+Rules:
+- Only the members listed under "Who answers" may reply. A member with nothing relevant in the memories stays silent.
+- One to three short sentences per reply, using only the memories given. Cite the codes you used.
+- No member repeats another. If the memories do not answer the question, say so instead of guessing.
+- If the exchange points to one decision, next step or lesson worth keeping that is not in memory yet, put it in
+  proposal as one self-contained sentence the CEO can accept. Otherwise proposal is null.
+${LENS_RULE}
+${STYLE}`;
+
+export async function crewChat(input: ChatInput): Promise<ChatOutput> {
+  if (env.llmEnabled() && input.memories.length) {
+    try {
+      const { output } = await generateText({
+        model: lm(input.oneOnOne ? "fast" : "main"),
+        system: CHAT_SYSTEM,
+        prompt: [
+          `Project: ${input.roomName}`,
+          ...roomContext(input.goal, input.lens),
+          `Who answers: ${input.speakers.join(", ")}`,
+          "",
+          "Memories:",
+          ...input.memories.map((m) => `${m.code} ${m.text}`),
+          "",
+          `CEO: ${input.message}`,
+        ].join("\n"),
+        output: Output.object({ schema: ChatSchema }),
+        abortSignal: patience(45_000),
+      });
+      return { ...output, source: "llm", model: `${env.llmProvider()}:${input.oneOnOne ? env.llmFastModel() : env.llmModel()}` };
+    } catch (e) {
+      console.warn(`[llm] chat fell back: ${(e as Error).message}`);
+    }
+  }
+  return { ...fallbackChat(input), source: "fallback", model: null };
+}
+
+/** Without a model: each speaker quotes its most relevant memories (recall order), nothing more. */
+export function fallbackChat(input: ChatInput): Pick<ChatOutput, "replies" | "proposal"> {
+  const replies = input.speakers
+    .map((agent) => {
+      const mine = input.memories.filter((m) => input.oneOnOne || DOMAIN[agent].includes(parseMemory(m.text).type as MemoryType)).slice(0, 2);
+      return { agent, text: mine.map((m) => parseMemory(m.text).body).join(" "), cites: mine.map((m) => m.code) };
+    })
+    .filter((r) => r.cites.length);
+  return { replies, proposal: null };
 }

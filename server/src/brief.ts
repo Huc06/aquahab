@@ -104,6 +104,8 @@ export async function runBrief(room: Room, kind: Brief["kind"] = "manual"): Prom
       dayIndex: room.dayIndex,
       memories: recalledSet.room,
       ceo: recalledSet.ceo,
+      goal: room.goal,
+      lens: room.contextTags,
     });
     source = draft.source;
     model = draft.model;

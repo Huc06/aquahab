@@ -81,7 +81,27 @@ export interface Room {
   createdAt: string;
   /** Day N of the crew remembering this room (1 on the day it was created). */
   dayIndex: number;
+  /**
+   * How each crew member is labelled in this room ("Brand Voice" for Lofi in a creator room). Wording only:
+   * the canonical titles in CREW and the memory types stay the same. null when the room has none.
+   */
+  contextTags: ContextTags | null;
 }
+
+/** A label per crew member, at most CONTEXT_TAG_MAX characters each. */
+export type ContextTags = Partial<Record<Role, string>>;
+export const CONTEXT_TAG_MAX = 40;
+
+/** One-click lenses for the room form. */
+export const CONTEXT_PRESETS: Record<"creator", ContextTags> = {
+  creator: {
+    one: "Content Strategy",
+    researcher: "Trends & Signals",
+    builder: "Tech & Distribution",
+    hippo: "Deals & Ops",
+    lofi: "Brand Voice",
+  },
+};
 
 export interface CreateRoomRequest {
   slug: string;
@@ -90,13 +110,30 @@ export interface CreateRoomRequest {
   private?: boolean;
   briefAt?: string;
   debriefAt?: string;
+  contextTags?: ContextTags;
 }
 
 export interface UpdateRoomRequest {
   name?: string;
+  /** An empty string clears the goal. */
+  goal?: string;
   briefAt?: string;
   debriefAt?: string;
+  /** Replaces the room's tags; {} clears them. */
+  contextTags?: ContextTags;
 }
+
+/** The quick-capture prefix for each type the CEO can file (feedback comes from rating a brief). */
+export const CAPTURE_PREFIX: Record<Exclude<MemoryType, "feedback">, string> = {
+  decision: "d:",
+  failure: "f:",
+  next: "n:",
+  done: "done:",
+  learned: "l:",
+  deadline: "due:",
+  story: "s:",
+  preference: "p:",
+};
 
 // ---------- briefs ----------
 
@@ -346,4 +383,69 @@ export interface BoardCard {
 export interface BoardResponse {
   roomId: string;
   columns: { column: BoardColumn; title: string; cards: BoardCard[] }[];
+}
+
+// ---------- creator studio: draft and ask the crew (nothing here is stored) ----------
+
+/** POST /api/rooms/:id/draft. The crew drafts from the room's voice, story and failure memories. */
+export interface DraftRequest {
+  /** What to write about, in the CEO's words. */
+  idea: string;
+  /** Who drafts (default "lofi"). */
+  agent?: Role;
+  /** Rework `previous` in one direction. */
+  refine?: "edgier" | "shorter" | "anecdote";
+  previous?: string;
+}
+
+/** A memory the draft followed or steered clear of. */
+export interface DraftRule {
+  blobId: string;
+  text: string;
+  agent: Role;
+  kind: "follow" | "avoid";
+}
+
+export interface DraftResponse {
+  roomId: string;
+  agent: Role;
+  draft: string;
+  rules: DraftRule[];
+  /** How many memories the crew recalled for this draft. */
+  recalled: number;
+  source: "llm" | "fallback";
+  model: string | null;
+}
+
+/** POST /api/rooms/:id/chat. Ephemeral: the message and the replies are not stored anywhere. */
+export interface ChatRequest {
+  message: string;
+  /** One member, or "all" (only members with relevant memories reply). */
+  agent: Role | "all";
+}
+
+export interface ChatReply {
+  agent: Role;
+  text: string;
+  /** Blob ids the reply is based on. A reply that cites nothing real is dropped. */
+  cites: string[];
+}
+
+/** A memory the crew suggests keeping. Commit it by POSTing `capture` to /api/rooms/:id/capture. */
+export interface ChatProposal {
+  type: Exclude<MemoryType, "feedback">;
+  /** Who will sign it (FILED_BY[type]). */
+  agent: Role;
+  text: string;
+  /** The capture text, prefix included, for example "d: Focus the next two weeks on …". */
+  capture: string;
+}
+
+export interface ChatResponse {
+  roomId: string;
+  replies: ChatReply[];
+  proposal: ChatProposal | null;
+  recalled: number;
+  source: "llm" | "fallback";
+  model: string | null;
 }
