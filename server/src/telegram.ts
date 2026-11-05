@@ -170,19 +170,6 @@ export async function askDebrief(room: Room) {
 
 // ---------- inbound ----------
 
-const HELP = [
-  "<b>Aquahab</b> · your project crew remembers where you left off.",
-  "",
-  "<b>Capture any time</b> (goes to the current room)",
-  "<code>d:</code> decision · <code>f:</code> failed · <code>n:</code> next · <code>done:</code> shipped",
-  "<code>l:</code> learned · <code>due:</code> deadline · <code>s:</code> story · <code>p:</code> how you like briefs",
-  "Or just write a note, and the crew proposes what to remember.",
-  "",
-  "<b>Commands</b>",
-  "/rooms switch room · /new name · /brief now · /debrief now",
-  "/ask question · /memories · /crew · /times 08:30 21:00 · /web",
-].join("\n");
-
 function safeEqual(a: string, b: string): boolean {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
@@ -205,7 +192,14 @@ async function bind(chatId: number, text: string): Promise<boolean> {
 // ---------- menu and onboarding (inline buttons) ----------
 
 /** What the next plain-text message means, when a button asked for input. */
-export type Pending = { kind: "feedback"; briefId: string } | { kind: "newRoom" } | { kind: "ask" } | { kind: "capture"; prefix: string };
+export type Pending =
+  | { kind: "feedback"; briefId: string }
+  | { kind: "newRoom" }
+  | { kind: "newRoomGoal"; name: string }
+  | { kind: "newRoomTimes"; name: string; goal?: string }
+  | { kind: "times" }
+  | { kind: "ask" }
+  | { kind: "capture"; prefix: string };
 
 export const CAPTURE_TYPES: [string, string][] = [
   ["d:", "Decision"],
@@ -218,7 +212,61 @@ export const CAPTURE_TYPES: [string, string][] = [
   ["p:", "Briefing style"],
 ];
 
-export const MENU_ACTIONS = ["web", "rooms", "new", "ask", "capture", "brief", "debrief", "memories", "crew", "times", "help", "menu", "done"] as const;
+/** Brief and debrief pairs offered as buttons. The first one is the room default (`createRoom`). */
+export const TIME_PRESETS: [string, string][] = [
+  ["08:30", "21:00"],
+  ["07:45", "20:30"],
+  ["09:00", "22:00"],
+];
+
+export const MENU_ACTIONS = ["web", "rooms", "new", "newskip", "newdef", "ask", "capture", "brief", "debrief", "memories", "crew", "times", "timesask", "help", "menu", "done"] as const;
+
+const GOAL_PROMPT = "What are you trying to achieve here? One line. Tap <i>Skip goal</i> to leave it out.";
+const TIMES_PROMPT = "When should the crew brief and debrief? Type two 24-hour times, for example <code>08:30 21:00</code>, or tap <i>Use default</i>. Add <code>private</code> to hide the room name on-chain.";
+const WIZARD_SKIP: Markup = { inline_keyboard: [[{ text: "Skip goal", callback_data: "m:newskip" }]] };
+const WIZARD_DEFAULT: Markup = { inline_keyboard: [[{ text: `Use default ${TIME_PRESETS[0].join(" · ")}`, callback_data: "m:newdef" }]] };
+const BACK_TO_MENU: Markup = { inline_keyboard: [[{ text: "↻ Menu", callback_data: "m:menu" }]] };
+
+/** The command and capture reference, shown by /help and "How to use". */
+export function helpHtml(): string {
+  return [
+    "<b>Aquahab</b> · your project crew remembers where you left off.",
+    "",
+    "<b>Capture any time</b> (goes to the current room)",
+    CAPTURE_TYPES.map(([p, label]) => `<code>${p}</code> ${label.toLowerCase()}`).join(" · "),
+    "Or just write a note, and the crew proposes what to remember.",
+    "",
+    "<b>Commands</b>",
+    "/rooms switch room · /new name [| goal] [| times] [private]",
+    "/brief now · /debrief now · /skip tonight's debrief",
+    "/ask question · /memories · /crew · /times · /web",
+  ].join("\n");
+}
+
+/** `08:30 21:00`, one time, or `private` alone. Null when the text is not a time choice. */
+export function parseTimes(text: string): { briefAt?: string; debriefAt?: string; private: boolean } | null {
+  const isPrivate = /\bprivate\b/i.test(text);
+  const rest = text.replace(/\bprivate\b/i, "").trim();
+  if (!rest) return { private: isPrivate };
+  const m = rest.match(/^(\d{1,2}:\d{2})(?:\s+(\d{1,2}:\d{2}))?$/);
+  if (!m || !isHHMM(m[1]) || (m[2] && !isHHMM(m[2]))) return null;
+  return { briefAt: m[1], debriefAt: m[2], private: isPrivate };
+}
+
+/** Callback data carries times without colons, `tm:0830:2100`, because `:` already separates the fields. */
+const compactTime = (hhmm: string) => hhmm.replace(":", "");
+const expandTime = (s: string | undefined) => (s && s.length === 4 ? `${s.slice(0, 2)}:${s.slice(2)}` : "");
+
+export function timesMarkup(): Markup {
+  return {
+    inline_keyboard: [
+      ...TIME_PRESETS.map(([b, d]) => [{ text: `${b} · ${d}`, callback_data: `tm:${compactTime(b)}:${compactTime(d)}` }]),
+      [{ text: "Type my own", callback_data: "m:timesask" }],
+    ],
+  };
+}
+
+const timesPrompt = (roomName: string) => `Brief and debrief times for <b>${esc(roomName)}</b>. Pick a pair, or type your own.`;
 
 export function menuMarkup(): Markup {
   return {
@@ -258,7 +306,7 @@ export function onboardingHtml(): string {
     "<b>Welcome to Aquahab.</b> Your crew remembers where you left off on each project.",
     "",
     "<b>1 · Create a room</b> for a real project. Tap ＋ New room.",
-    "<b>2 · Capture</b> what matters. Tap ✎ Capture, pick a type, then type the note.",
+    "<b>2 · Capture</b> what matters. Tap ✎ Capture, pick a type, then type the note. Or type the prefix yourself, for example <code>d: we chose Neon</code>.",
     "<b>3 · Read the brief</b> each morning at 08:30, and answer the debrief at 21:00.",
     "",
     "Tap 👍 or 👎 on a brief. The crew learns from it.",
@@ -290,16 +338,32 @@ async function showMenu(chatId: number) {
   await send(chatId, menuHtml(room?.name ?? null), menuMarkup());
 }
 
+/** Sets what the next plain-text message means, then asks for it. */
+async function ask(chatId: number, pending: Pending, text: string, markup?: Markup) {
+  await setSetting("telegram.await", pending);
+  await send(chatId, text, markup);
+}
+
+/** Opens the room and files the day-one brief. Used by `/new` and by the New room steps. */
+async function openRoom(chatId: number, input: { name: string; goal?: string; briefAt?: string; debriefAt?: string; private: boolean }) {
+  try {
+    const r = await createRoom({ slug: input.name, name: input.name, goal: input.goal, briefAt: input.briefAt, debriefAt: input.debriefAt, private: input.private });
+    await setSetting("telegram.room", r.id);
+    await send(chatId, `Room <b>${esc(r.name)}</b> is open. Namespace <code>${esc(r.namespace)}</code>. Brief ${r.briefAt}, debrief ${r.debriefAt}.`);
+    const b = await runBrief(r, "day-one");
+    const { html, markup } = renderBrief(r, b);
+    await send(chatId, html, markup);
+  } catch (e) {
+    await send(chatId, esc((e as Error).message));
+  }
+}
+
 async function handleMenu(chatId: number, messageId: number, action: string) {
-  const ask = async (pending: Pending, text: string) => {
-    await setSetting("telegram.await", pending);
-    await send(chatId, text);
-  };
   switch (action) {
     case "menu":
       return void (await showMenu(chatId));
     case "help":
-      return void (await send(chatId, onboardingHtml(), onboardingMarkup()));
+      return void (await send(chatId, helpHtml(), BACK_TO_MENU));
     case "done":
       await setSetting("telegram.onboarded", true);
       return void (await showMenu(chatId));
@@ -312,19 +376,60 @@ async function handleMenu(chatId: number, messageId: number, action: string) {
     case "crew":
       return void (await handleText(chatId, messageId, `/${action}`, null));
     case "new":
-      return void (await ask({ kind: "newRoom" }, "Name your project. It becomes a room, for example <i>Aquahab</i>."));
+      return void (await ask(chatId, { kind: "newRoom" }, "Name your project. It becomes a room, for example <i>Aquahab</i>."));
+    case "newskip":
+    case "newdef": {
+      // The goal and times buttons only mean something inside the New room steps.
+      const pending = await getSetting<Pending | null>("telegram.await");
+      if (action === "newskip" && pending?.kind === "newRoomGoal") {
+        return void (await ask(chatId, { kind: "newRoomTimes", name: pending.name }, TIMES_PROMPT, WIZARD_DEFAULT));
+      }
+      if (action === "newdef" && pending?.kind === "newRoomTimes") {
+        await setSetting("telegram.await", null);
+        return void (await openRoom(chatId, { name: pending.name, goal: pending.goal, private: false }));
+      }
+      return void (await send(chatId, "That step has passed. Tap ＋ New room to start again.", BACK_TO_MENU));
+    }
     case "ask":
-      return void (await ask({ kind: "ask" }, "What do you want to know? The answer comes from this room's memory."));
+      return void (await ask(chatId, { kind: "ask" }, "What do you want to know? The answer comes from this room's memory."));
     case "capture": {
       const rows: Markup["inline_keyboard"] = [];
       for (let i = 0; i < CAPTURE_TYPES.length; i += 2) {
         rows.push(CAPTURE_TYPES.slice(i, i + 2).map(([p, label]) => ({ text: label, callback_data: `c:${p}` })));
       }
-      return void (await send(chatId, "Pick a type, then type the note.", { inline_keyboard: rows }));
+      return void (await send(chatId, `Pick a type, then type the note. Or type the prefix yourself, for example <code>d: we chose Neon</code>.`, { inline_keyboard: rows }));
     }
     case "times":
-      return void (await send(chatId, "Set both times in one message: <code>/times 08:30 21:00</code> (brief, then debrief, 24-hour clock)."));
+      return void (await sendTimesPicker(chatId));
+    case "timesask":
+      return void (await ask(chatId, { kind: "times" }, "Type brief and debrief, 24-hour, for example <code>08:30 21:00</code>."));
   }
+}
+
+/** The times picker for the active room. Shared by ⏰ Times and `/times` with no arguments. */
+async function sendTimesPicker(chatId: number) {
+  const room = await activeRoom();
+  if (!room) return void (await send(chatId, "Create a room first with ＋ New room.", BACK_TO_MENU));
+  return void (await send(chatId, timesPrompt(room.name), timesMarkup()));
+}
+
+/** `/new Name | goal | 07:45 20:30`: the goal and the times are optional, in that order. */
+export function parseNewRoom(arg: string): { name: string; goal?: string; briefAt?: string; debriefAt?: string; private: boolean } {
+  const isPrivate = /\bprivate\b/i.test(arg);
+  const parts = arg.replace(/\bprivate\b/i, "").split("|").map((p) => p.trim()).filter((p) => p.length > 0);
+  const name = parts[0] ?? "";
+  let rest = parts.slice(1);
+  let briefAt: string | undefined;
+  let debriefAt: string | undefined;
+  const last = rest[rest.length - 1];
+  const times = last?.match(/^(\d{1,2}:\d{2})(?:\s+(\d{1,2}:\d{2}))?$/);
+  if (times) {
+    briefAt = times[1];
+    debriefAt = times[2];
+    rest = rest.slice(0, -1);
+  }
+  const goal = rest.join(" | ") || undefined;
+  return { name, goal, briefAt, debriefAt, private: isPrivate };
 }
 
 async function handleText(chatId: number, messageId: number, text: string, replyTo: number | null) {
@@ -341,24 +446,13 @@ async function handleText(chatId: number, messageId: number, text: string, reply
 
   switch (cmd.split("@")[0]) {
     case "/help":
-      return void (await send(chatId, onboardingHtml(), onboardingMarkup()));
+      return void (await send(chatId, helpHtml(), BACK_TO_MENU));
     case "/menu":
       return void (await showMenu(chatId));
     case "/new": {
-      if (!arg) return void (await send(chatId, "Name the project: <code>/new Aquahab</code> (add <code>private</code> to hide its name on-chain)."));
-      const isPrivate = /\bprivate\b/i.test(arg);
-      const name = arg.replace(/\bprivate\b/i, "").trim();
-      try {
-        const r = await createRoom({ slug: name, name, private: isPrivate });
-        await setSetting("telegram.room", r.id);
-        await send(chatId, `Room <b>${esc(r.name)}</b> is open. Namespace <code>${esc(r.namespace)}</code>. Brief ${r.briefAt}, debrief ${r.debriefAt}.`);
-        const b = await runBrief(r, "day-one");
-        const { html, markup } = renderBrief(r, b);
-        await send(chatId, html, markup);
-      } catch (e) {
-        await send(chatId, esc((e as Error).message));
-      }
-      return;
+      const room0 = parseNewRoom(arg);
+      if (!room0.name) return void (await send(chatId, "Name the project: <code>/new Aquahab | what you are trying to achieve | 08:30 21:00</code>. The goal and the times are optional; add <code>private</code> to hide the name on-chain. Or tap ＋ New room in the menu for step-by-step."));
+      return void (await openRoom(chatId, room0));
     }
     case "/rooms": {
       const rooms = await listRooms();
@@ -421,6 +515,7 @@ async function handleText(chatId: number, messageId: number, text: string, reply
       ));
     }
     case "/times": {
+      if (!rest.length) return void (await sendTimesPicker(chatId));
       const [briefAt, debriefAt] = rest;
       if (!briefAt || !isHHMM(briefAt) || (debriefAt && !isHHMM(debriefAt))) return void (await send(chatId, "Use 24-hour times: <code>/times 08:30 21:00</code>"));
       const r = await updateRoom(room.id, { briefAt, debriefAt });
@@ -435,7 +530,14 @@ async function handleText(chatId: number, messageId: number, text: string, reply
   const pending = await getSetting<Pending | null>("telegram.await");
   if (pending && pending.kind !== "feedback") {
     await setSetting("telegram.await", null);
-    if (pending.kind === "newRoom") return handleText(chatId, messageId, `/new ${t}`, replyTo);
+    if (pending.kind === "newRoom") return void (await ask(chatId, { kind: "newRoomGoal", name: t }, GOAL_PROMPT, WIZARD_SKIP));
+    if (pending.kind === "newRoomGoal") return void (await ask(chatId, { kind: "newRoomTimes", name: pending.name, goal: t }, TIMES_PROMPT, WIZARD_DEFAULT));
+    if (pending.kind === "newRoomTimes") {
+      const times = parseTimes(t);
+      if (!times) return void (await ask(chatId, pending, `Use 24-hour times like <code>08:30 21:00</code>, or tap <i>Use default</i>.`, WIZARD_DEFAULT));
+      return void (await openRoom(chatId, { name: pending.name, goal: pending.goal, ...times }));
+    }
+    if (pending.kind === "times") return handleText(chatId, messageId, `/times ${t}`, replyTo);
     if (pending.kind === "ask") return handleText(chatId, messageId, `/ask ${t}`, replyTo);
     return handleText(chatId, messageId, `${pending.prefix} ${t}`, replyTo);
   }
@@ -506,6 +608,15 @@ async function handleCallback(chatId: number, messageId: number, data: string, c
     await ack();
     if (brief) await send(chatId, receiptsHtml(brief), undefined, messageId);
     return;
+  }
+  if (kind === "tm") {
+    const room = await activeRoom();
+    const briefAt = expandTime(a);
+    const debriefAt = expandTime(b);
+    if (!room || !isHHMM(briefAt) || !isHHMM(debriefAt)) return void (await ack("Time not valid"));
+    const r = await updateRoom(room.id, { briefAt, debriefAt });
+    await ack(`Set ${r.briefAt} · ${r.debriefAt}`);
+    return void (await edit(chatId, messageId, `${esc(r.name)}: brief at ${r.briefAt}, debrief at ${r.debriefAt} (${esc(r.timezone)}).`));
   }
   if (kind === "t") {
     await q(`update candidates set keep = not keep where id = $1 and status = 'proposed'`, [a]);
@@ -600,6 +711,7 @@ export async function startPolling() {
       { command: "memories", description: "Latest memories in this room" },
       { command: "crew", description: "Who works here (from Sui)" },
       { command: "times", description: "Set brief and debrief times" },
+      { command: "skip", description: "Skip tonight's debrief" },
       { command: "web", description: "Open the office" },
       { command: "menu", description: "Open the menu" },
       { command: "help", description: "How to use the crew" },
