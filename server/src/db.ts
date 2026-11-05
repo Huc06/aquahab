@@ -40,6 +40,7 @@ const SCHEMA = [
      start_date text not null,
      archived boolean not null default false,
      created_at timestamptz not null default now())`,
+  `alter table rooms add column if not exists goal text`,
   `create table if not exists settings (key text primary key, value jsonb not null)`,
   `create table if not exists memory_jobs (
      id text primary key,

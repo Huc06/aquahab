@@ -21,6 +21,7 @@ function toRoom(r: Record<string, any>, memoryCount: number, lastBriefAt: string
     id: r.id,
     slug: r.slug,
     name: r.name,
+    goal: r.goal ?? null,
     namespace: r.namespace,
     private: !!r.private,
     briefAt: r.brief_at,
@@ -58,7 +59,8 @@ export async function createRoom(req: CreateRoomRequest): Promise<Room> {
   if (!isHHMM(briefAt) || !isHHMM(debriefAt)) throw new RoomError("Times are HH:MM, 24-hour.");
   if (await one(`select id from rooms where slug = $1`, [slug])) throw new RoomError(`Room '${slug}' already exists.`);
   const id = newId("room");
-  await q(`insert into rooms (id, slug, name, namespace, private, brief_at, debrief_at, start_date) values ($1,$2,$3,$4,$5,$6,$7,$8)`, [
+  const goal = req.goal?.trim().slice(0, 280) || null;
+  await q(`insert into rooms (id, slug, name, namespace, private, brief_at, debrief_at, start_date, goal) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [
     id,
     slug,
     name,
@@ -67,6 +69,7 @@ export async function createRoom(req: CreateRoomRequest): Promise<Room> {
     briefAt,
     debriefAt,
     localParts(new Date(), env.timezone()).date,
+    goal,
   ]);
   return (await getRoom(id))!;
 }

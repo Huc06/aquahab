@@ -1,5 +1,6 @@
 // The HTTP API (see contract.ts for every shape). The web app proxies /api/* here, same-origin.
 import { Hono, type Context } from "hono";
+import { getBoard } from "./board.ts";
 import { streamSSE } from "hono/streaming";
 import type { ApiError, BriefFeedbackRequest, CaptureRequest, CreateRoomRequest, DebriefRequest, DecideRequest, RecallResponse, UpdateRoomRequest } from "./contract.ts";
 import { MEMORY_TYPES } from "./contract.ts";
@@ -73,6 +74,7 @@ app.get("/api/rooms/:id/brief/latest", async (c) => {
   return b ? c.json(b) : fail(c, 404, "No brief yet.");
 });
 app.get("/api/rooms/:id/briefs", async (c) => c.json(await listBriefs((await roomOr404(c)).id)));
+app.get("/api/rooms/:id/board", async (c) => c.json(await getBoard((await roomOr404(c)).id)));
 app.post("/api/rooms/:id/brief", ceo, async (c) => c.json(await runBrief(await roomOr404(c), "manual"), 201));
 app.get("/api/briefs/:id", async (c) => {
   const b = await getBrief(c.req.param("id"));
