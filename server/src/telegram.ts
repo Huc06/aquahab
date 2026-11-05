@@ -202,13 +202,136 @@ async function bind(chatId: number, text: string): Promise<boolean> {
   return false;
 }
 
+// ---------- menu and onboarding (inline buttons) ----------
+
+/** What the next plain-text message means, when a button asked for input. */
+export type Pending = { kind: "feedback"; briefId: string } | { kind: "newRoom" } | { kind: "ask" } | { kind: "capture"; prefix: string };
+
+export const CAPTURE_TYPES: [string, string][] = [
+  ["d:", "Decision"],
+  ["f:", "Failed"],
+  ["n:", "Next"],
+  ["done:", "Shipped"],
+  ["l:", "Learned"],
+  ["due:", "Deadline"],
+  ["s:", "Story"],
+  ["p:", "Briefing style"],
+];
+
+export const MENU_ACTIONS = ["web", "rooms", "new", "ask", "capture", "brief", "debrief", "memories", "crew", "times", "help", "menu", "done"] as const;
+
+export function menuMarkup(): Markup {
+  return {
+    inline_keyboard: [
+      [{ text: "⚡ Open office", callback_data: "m:web" }],
+      [
+        { text: "◈ Rooms", callback_data: "m:rooms" },
+        { text: "＋ New room", callback_data: "m:new" },
+      ],
+      [
+        { text: "✎ Capture", callback_data: "m:capture" },
+        { text: "? Ask memory", callback_data: "m:ask" },
+      ],
+      [
+        { text: "☀ Brief now", callback_data: "m:brief" },
+        { text: "☾ Debrief now", callback_data: "m:debrief" },
+      ],
+      [
+        { text: "≡ Memories", callback_data: "m:memories" },
+        { text: "⌂ Crew", callback_data: "m:crew" },
+      ],
+      [
+        { text: "⏰ Times", callback_data: "m:times" },
+        { text: "i How to use", callback_data: "m:help" },
+      ],
+      [{ text: "↻ Refresh", callback_data: "m:menu" }],
+    ],
+  };
+}
+
+export function menuHtml(roomName: string | null): string {
+  return ["<b>Aquahab</b>", "Select an option below.", roomName ? `Notes go to <b>${esc(roomName)}</b>.` : "Create a room first with ＋ New room."].join("\n");
+}
+
+export function onboardingHtml(): string {
+  return [
+    "<b>Welcome to Aquahab.</b> Your crew remembers where you left off on each project.",
+    "",
+    "<b>1 · Create a room</b> for a real project. Tap ＋ New room.",
+    "<b>2 · Capture</b> what matters. Tap ✎ Capture, pick a type, then type the note.",
+    "<b>3 · Read the brief</b> each morning at 08:30, and answer the debrief at 21:00.",
+    "",
+    "Tap 👍 or 👎 on a brief. The crew learns from it.",
+  ].join("\n");
+}
+
+export function onboardingMarkup(): Markup {
+  return {
+    inline_keyboard: [
+      [{ text: "＋ Create my first room", callback_data: "m:new" }],
+      [{ text: "✎ Try a capture", callback_data: "m:capture" }],
+      [{ text: "Got it", callback_data: "m:done" }],
+    ],
+  };
+}
+
+// Telegram accepts only https links on buttons. Local development falls back to a plain link.
+async function sendOfficeLink(chatId: number) {
+  const url = magicLink();
+  if (url.startsWith("https://")) {
+    return void (await send(chatId, "Your office (link valid 15 minutes):", { inline_keyboard: [[{ text: "Open Aquahab as CEO", url }]] }));
+  }
+  return void (await send(chatId, `Your office (link valid 15 minutes, local URL):\n<code>${esc(url)}</code>`));
+}
+
+async function showMenu(chatId: number) {
+  if (!(await getSetting<boolean>("telegram.onboarded"))) return void (await send(chatId, onboardingHtml(), onboardingMarkup()));
+  const room = await activeRoom();
+  await send(chatId, menuHtml(room?.name ?? null), menuMarkup());
+}
+
+async function handleMenu(chatId: number, messageId: number, action: string) {
+  const ask = async (pending: Pending, text: string) => {
+    await setSetting("telegram.await", pending);
+    await send(chatId, text);
+  };
+  switch (action) {
+    case "menu":
+      return void (await showMenu(chatId));
+    case "help":
+      return void (await send(chatId, onboardingHtml(), onboardingMarkup()));
+    case "done":
+      await setSetting("telegram.onboarded", true);
+      return void (await showMenu(chatId));
+    case "web":
+      return void (await sendOfficeLink(chatId));
+    case "rooms":
+    case "brief":
+    case "debrief":
+    case "memories":
+    case "crew":
+      return void (await handleText(chatId, messageId, `/${action}`, null));
+    case "new":
+      return void (await ask({ kind: "newRoom" }, "Name your project. It becomes a room, for example <i>Aquahab</i>."));
+    case "ask":
+      return void (await ask({ kind: "ask" }, "What do you want to know? The answer comes from this room's memory."));
+    case "capture": {
+      const rows: Markup["inline_keyboard"] = [];
+      for (let i = 0; i < CAPTURE_TYPES.length; i += 2) {
+        rows.push(CAPTURE_TYPES.slice(i, i + 2).map(([p, label]) => ({ text: label, callback_data: `c:${p}` })));
+      }
+      return void (await send(chatId, "Pick a type, then type the note.", { inline_keyboard: rows }));
+    }
+    case "times":
+      return void (await send(chatId, "Set both times in one message: <code>/times 08:30 21:00</code> (brief, then debrief, 24-hour clock)."));
+  }
+}
+
 async function handleText(chatId: number, messageId: number, text: string, replyTo: number | null) {
   const t = text.trim();
   if (t.startsWith("/start")) {
     if (!(await bind(chatId, t))) return void (await send(chatId, "This crew works for one CEO. Ask the owner for the pair code."));
-    const rooms = await listRooms();
-    await send(chatId, `${HELP}\n\n${rooms.length ? `Rooms: ${rooms.map((r) => esc(r.name)).join(", ")}` : "Create your first room: <code>/new Aquahab</code>"}`);
-    return;
+    return void (await showMenu(chatId));
   }
   if ((await ceoChat()) !== chatId) return void (await send(chatId, "This crew works for one CEO."));
 
@@ -218,7 +341,9 @@ async function handleText(chatId: number, messageId: number, text: string, reply
 
   switch (cmd.split("@")[0]) {
     case "/help":
-      return void (await send(chatId, HELP));
+      return void (await send(chatId, onboardingHtml(), onboardingMarkup()));
+    case "/menu":
+      return void (await showMenu(chatId));
     case "/new": {
       if (!arg) return void (await send(chatId, "Name the project: <code>/new Aquahab</code> (add <code>private</code> to hide its name on-chain)."));
       const isPrivate = /\bprivate\b/i.test(arg);
@@ -302,12 +427,19 @@ async function handleText(chatId: number, messageId: number, text: string, reply
       return void (await send(chatId, `${esc(r.name)}: brief at ${r.briefAt}, debrief at ${r.debriefAt} (${esc(r.timezone)}).`));
     }
     case "/web":
-      return void (await send(chatId, "Your office (link valid 15 minutes):", { inline_keyboard: [[{ text: "Open Aquahab as CEO", url: magicLink() }]] }));
+      return void (await sendOfficeLink(chatId));
   }
-  if (cmd.startsWith("/")) return void (await send(chatId, HELP));
+  if (cmd.startsWith("/")) return void (await showMenu(chatId));
 
   // Plain text: a reply to the feedback question, a debrief answer, a quick capture, or a free note.
-  const awaiting = await getSetting<{ kind: "feedback"; briefId: string } | null>("telegram.await");
+  const pending = await getSetting<Pending | null>("telegram.await");
+  if (pending && pending.kind !== "feedback") {
+    await setSetting("telegram.await", null);
+    if (pending.kind === "newRoom") return handleText(chatId, messageId, `/new ${t}`, replyTo);
+    if (pending.kind === "ask") return handleText(chatId, messageId, `/ask ${t}`, replyTo);
+    return handleText(chatId, messageId, `${pending.prefix} ${t}`, replyTo);
+  }
+  const awaiting = pending;
   if (awaiting?.kind === "feedback") {
     await setSetting("telegram.await", null);
     await rateBrief(awaiting.briefId, "down", t, null);
@@ -342,6 +474,16 @@ async function handleCallback(chatId: number, messageId: number, data: string, c
   if ((await ceoChat()) !== chatId) return void (await ack("Not your crew."));
   const [kind, a, b] = data.split(":");
 
+  if (kind === "m") {
+    await ack();
+    return void (await handleMenu(chatId, messageId, a));
+  }
+  if (kind === "c") {
+    const prefix = data.slice(2);
+    await setSetting("telegram.await", { kind: "capture", prefix });
+    await ack();
+    return void (await send(chatId, `Type the note. It is filed as <code>${esc(prefix)}</code>.`));
+  }
   if (kind === "room") {
     const r = await getRoom(a);
     if (r) await setSetting("telegram.room", r.id);
@@ -459,6 +601,7 @@ export async function startPolling() {
       { command: "crew", description: "Who works here (from Sui)" },
       { command: "times", description: "Set brief and debrief times" },
       { command: "web", description: "Open the office" },
+      { command: "menu", description: "Open the menu" },
       { command: "help", description: "How to use the crew" },
     ],
   }).catch(() => {});
