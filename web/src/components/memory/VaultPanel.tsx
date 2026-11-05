@@ -2,6 +2,7 @@
 
 import { api } from "@/lib/api";
 import { useApi, useActiveRoom } from "@/lib/useApi";
+import { BlobReceiptPopover } from "@/components/receipt/BlobReceiptPopover";
 
 // The room's memory as the relayer lists it, with the on-chain check from Sui through Tatum.
 export function VaultPanel() {
@@ -34,6 +35,9 @@ export function VaultPanel() {
               {m.verified ? "verified on Sui" : "not yet verified"}
               {m.expiresAt ? ` · expires ${new Date(m.expiresAt).toLocaleDateString()}` : ""}
             </p>
+            <div className="mt-2">
+              <BlobReceiptPopover blobId={m.blobId} />
+            </div>
           </li>
         ))}
       </ul>
