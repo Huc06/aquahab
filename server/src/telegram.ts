@@ -275,6 +275,15 @@ export function onboardingMarkup(): Markup {
   };
 }
 
+// Telegram accepts only https links on buttons. Local development falls back to a plain link.
+async function sendOfficeLink(chatId: number) {
+  const url = magicLink();
+  if (url.startsWith("https://")) {
+    return void (await send(chatId, "Your office (link valid 15 minutes):", { inline_keyboard: [[{ text: "Open Aquahab as CEO", url }]] }));
+  }
+  return void (await send(chatId, `Your office (link valid 15 minutes, local URL):\n<code>${esc(url)}</code>`));
+}
+
 async function showMenu(chatId: number) {
   if (!(await getSetting<boolean>("telegram.onboarded"))) return void (await send(chatId, onboardingHtml(), onboardingMarkup()));
   const room = await activeRoom();
@@ -295,7 +304,7 @@ async function handleMenu(chatId: number, messageId: number, action: string) {
       await setSetting("telegram.onboarded", true);
       return void (await showMenu(chatId));
     case "web":
-      return void (await send(chatId, "Your office (link valid 15 minutes):", { inline_keyboard: [[{ text: "Open Aquahab as CEO", url: magicLink() }]] }));
+      return void (await sendOfficeLink(chatId));
     case "rooms":
     case "brief":
     case "debrief":
@@ -418,7 +427,7 @@ async function handleText(chatId: number, messageId: number, text: string, reply
       return void (await send(chatId, `${esc(r.name)}: brief at ${r.briefAt}, debrief at ${r.debriefAt} (${esc(r.timezone)}).`));
     }
     case "/web":
-      return void (await send(chatId, "Your office (link valid 15 minutes):", { inline_keyboard: [[{ text: "Open Aquahab as CEO", url: magicLink() }]] }));
+      return void (await sendOfficeLink(chatId));
   }
   if (cmd.startsWith("/")) return void (await showMenu(chatId));
 
