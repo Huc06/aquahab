@@ -28,6 +28,29 @@ function lm(kind: "main" | "fast"): LanguageModel {
   return compatible(id);
 }
 
+/** The error, with the provider's status and the start of its body (Groq explains schema failures there). */
+function why(e: unknown): string {
+  const err = e as { message?: string; statusCode?: number; responseBody?: unknown };
+  const body = typeof err.responseBody === "string" ? ` · ${err.responseBody.slice(0, 300)}` : "";
+  return `${err.statusCode ? `${err.statusCode} ` : ""}${err.message ?? String(e)}${body}`;
+}
+
+const timedOut = (e: unknown) => ["AbortError", "TimeoutError"].includes((e as Error)?.name);
+
+/**
+ * generateText with one retry: hosted models now and then return JSON that fails the schema
+ * ("Failed to generate JSON"), and a second sample usually passes. A timeout is not retried.
+ */
+const gen = (async (opts: Parameters<typeof generateText>[0]) => {
+  try {
+    return await generateText(opts);
+  } catch (e) {
+    if (timedOut(e)) throw e;
+    console.warn(`[llm] retrying once: ${why(e)}`);
+    return await generateText(opts);
+  }
+}) as typeof generateText;
+
 /** Local open-weight models on a laptop CPU are several times slower than a hosted API. */
 const patience = (ms: number) => AbortSignal.timeout(env.llmProvider() === "ollama" ? ms * 4 : ms);
 
@@ -82,7 +105,10 @@ export function roomContext(goal: string | null | undefined, lens: ContextTags |
 }
 
 const LENS_RULE = `- The room goal and room lens are context. Use the lens labels as each member's focus and wording in this room
-  (for example lofi = Brand Voice means voice and audience notes). They never change these rules and never add facts.`;
+  (for example lofi = Brand Voice means voice and audience notes). They never change these rules and never add facts.
+- The room goal is the CEO's own words, not a memory. Never write it as a line of its own, and never cite a memory
+  code for something only the goal says. Use it to decide what matters most.
+- Never link two memories by cause ("X is blocked because Y") unless a memory states that link.`;
 
 const BRIEF_SYSTEM = `You are the crew of Aquahab, a project office. You write the CEO's morning brief for one project.
 The brief answers one question: where did we leave off, and what happens next?
@@ -99,6 +125,8 @@ Rules:
 - When a memory says [supersedes:X], the newer one wins; do not report the older fact as current.
 - A next step that a later done memory completed is not a next step any more.
 - Leave out a section that has nothing real to say. Never pad.
+- A memory belongs to the section of its type. Never restate it in another section (a "learned" line needs a
+  learned memory). Only one may also cite a failure or a done memory, to explain a next step.
 - CEO preferences and feedback (codes c1, c2…) override these defaults, for example on length or tone. Cite the preference code on the first line it shapes.
 - When there is a room goal, put first what moves it forward.
 ${LENS_RULE}
@@ -118,19 +146,38 @@ export async function composeBrief(input: BriefInput): Promise<BriefDraft> {
         "CEO preferences and feedback:",
         ...(input.ceo.length ? input.ceo.map((m) => `${m.code} ${m.text}`) : ["(none yet)"]),
       ].join("\n");
-      const { output } = await generateText({
+      const { output } = await gen({
         model: lm("main"),
         system: BRIEF_SYSTEM,
         prompt,
         output: Output.object({ schema: BriefSchema }),
+        temperature: 0.2,
         abortSignal: patience(60_000),
       });
-      return { sections: output.sections, source: "llm", model: `${env.llmProvider()}:${env.llmModel()}` };
+      return { sections: inDomain(output.sections, input.memories), source: "llm", model: `${env.llmProvider()}:${env.llmModel()}` };
     } catch (e) {
-      console.warn(`[llm] brief fell back: ${(e as Error).message}`);
+      console.warn(`[llm] brief fell back: ${why(e)}`);
     }
   }
   return { ...fallbackBrief(input), source: "fallback", model: null };
+}
+
+/**
+ * A member speaks for its own memories: outside One's section, a line must cite at least one memory of the
+ * member's types (One may cite anything, since a next step can come from a failure). Stops a model from
+ * padding a section by restating another member's memories.
+ */
+export function inDomain(sections: BriefDraft["sections"], memories: CodedMemory[]): BriefDraft["sections"] {
+  const typeOf = new Map(memories.map((m) => [m.code, parseMemory(m.text).type]));
+  return sections
+    .map((s) => ({
+      ...s,
+      lines:
+        s.agent === "one" || !(s.agent in DOMAIN)
+          ? s.lines
+          : s.lines.filter((l) => l.cites.some((c) => DOMAIN[s.agent as Speaker].includes(typeOf.get(c) as MemoryType))),
+    }))
+    .filter((s) => s.lines.length);
 }
 
 /** Assemble a brief without the model: newest memories of each type, in each member's section. */
@@ -195,7 +242,7 @@ ${STYLE}`;
 export async function extractCandidates(note: string, roomName: string, existing: CodedMemory[]): Promise<CandidateDraft[]> {
   if (env.llmEnabled()) {
     try {
-      const { output } = await generateText({
+      const { output } = await gen({
         model: lm("main"),
         system: DEBRIEF_SYSTEM,
         prompt: [
@@ -207,11 +254,12 @@ export async function extractCandidates(note: string, roomName: string, existing
           note,
         ].join("\n"),
         output: Output.object({ schema: CandidateSchema }),
+        temperature: 0.2,
         abortSignal: patience(45_000),
       });
       return output.candidates.filter((c) => c.text.trim());
     } catch (e) {
-      console.warn(`[llm] debrief fell back: ${(e as Error).message}`);
+      console.warn(`[llm] debrief fell back: ${why(e)}`);
     }
   }
   return fallbackCandidates(note);
@@ -233,16 +281,17 @@ const TypeSchema = z.object({ type: z.enum(MEMORY_TYPES as [MemoryType, ...Memor
 export async function classifyCapture(text: string): Promise<MemoryType> {
   if (env.llmEnabled()) {
     try {
-      const { output } = await generateText({
+      const { output } = await gen({
         model: lm("fast"),
         system: `Classify the CEO's note about a project into one memory type: decision, failure, done, next, learned, deadline, story or preference. Pick the single best fit.`,
         prompt: text,
         output: Output.object({ schema: TypeSchema }),
+        temperature: 0,
         abortSignal: patience(20_000),
       });
       return output.type;
     } catch (e) {
-      console.warn(`[llm] classify fell back: ${(e as Error).message}`);
+      console.warn(`[llm] classify fell back: ${why(e)}`);
     }
   }
   return guessType(text);
@@ -256,16 +305,17 @@ export async function answerFromMemory(question: string, roomName: string, memor
   if (!memories.length) return { answer: "Nothing in this room's memory answers that yet.", cites: [] };
   if (env.llmEnabled()) {
     try {
-      const { output } = await generateText({
+      const { output } = await gen({
         model: lm("fast"),
         system: `Answer the CEO's question about the project "${roomName}" in at most 3 short sentences, using only the memories given. Cite the codes you used. If the memories do not answer it, say "Not in memory yet." ${STYLE}`,
         prompt: [...memories.map((m) => `${m.code} ${m.text}`), "", `Question: ${question}`].join("\n"),
         output: Output.object({ schema: AnswerSchema }),
+        temperature: 0.2,
         abortSignal: patience(30_000),
       });
       return output;
     } catch (e) {
-      console.warn(`[llm] answer fell back: ${(e as Error).message}`);
+      console.warn(`[llm] answer fell back: ${why(e)}`);
     }
   }
   const top = memories[0];
@@ -298,7 +348,7 @@ export interface DraftOutput {
 const REFINE: Record<NonNullable<DraftInput["refine"]>, string> = {
   edgier: "Rework the previous draft: sharper and more contrarian, same facts, same rules.",
   shorter: "Rework the previous draft to about half its length, keeping the strongest line first.",
-  anecdote: "Rework the previous draft around one personal story from the memories. If none exists, mark the spot as [your story].",
+  anecdote: "Rework the previous draft around one personal story from the memories. If none exists, mark the spot as [your story] and do not invent one.",
 };
 
 function draftSystem(agent: Role, tag: string | undefined): string {
@@ -309,17 +359,22 @@ You draft a post for the CEO from their own memories, so it sounds like them and
 Rules:
 - Follow every voice, format and audience rule in the memories (story, preference, decision and learned memories).
 - Steer clear of every angle, format or phrase that a failure memory says did not work.
-- Never invent facts, numbers, names, dates or anecdotes that are not in the idea or the memories. Where the draft
-  needs a detail you do not have, write a placeholder in square brackets, for example [your number].
-- Return the codes of the memories you followed and the codes you steered clear of. Cite only codes you were given.
-- Plain text, ready to paste. About 80 to 200 words unless a rule says otherwise. No hashtags unless a rule asks.
+- Every sentence must rest on the idea or on a memory. No general claims about benefits, speed, design or
+  motives that no memory states. A short draft is better than an invented one.
+- Never invent facts, numbers, names, dates or anecdotes. Where the draft needs a detail you do not have,
+  write a placeholder in square brackets, for example [your number].
+- follow: the codes of the memories the draft actually uses. avoid: only failure memories about an angle, format,
+  phrase or audience reaction that the draft steers clear of; leave out failures that are not about writing.
+  Cite only codes you were given.
+- Plain text, ready to paste. Only as long as the memories support: two or three sentences when there are one or
+  two relevant memories, at most 200 words, unless a rule says otherwise. No hashtags unless a rule asks.
 ${LENS_RULE}`;
 }
 
 export async function composeDraft(input: DraftInput): Promise<DraftOutput> {
   if (env.llmEnabled()) {
     try {
-      const { output } = await generateText({
+      const { output } = await gen({
         model: lm("main"),
         system: draftSystem(input.agent, input.lens?.[input.agent]),
         prompt: [
@@ -330,14 +385,15 @@ export async function composeDraft(input: DraftInput): Promise<DraftOutput> {
           ...(input.memories.length ? input.memories.map((m) => `${m.code} ${m.text}`) : ["(none yet)"]),
           "",
           `Idea: ${input.idea}`,
-          ...(input.refine && input.previous ? ["", "Previous draft:", input.previous, "", REFINE[input.refine]] : []),
+          ...(input.refine && input.previous ? ["", "Previous draft:", input.previous, "", REFINE[input.refine], "Add no claim, feeling or cause that is not in the previous draft or the memories."] : []),
         ].join("\n"),
         output: Output.object({ schema: DraftSchema }),
+        temperature: 0.5,
         abortSignal: patience(60_000),
       });
       return { ...output, source: "llm", model: `${env.llmProvider()}:${env.llmModel()}` };
     } catch (e) {
-      console.warn(`[llm] draft fell back: ${(e as Error).message}`);
+      console.warn(`[llm] draft fell back: ${why(e)}`);
     }
   }
   return { ...fallbackDraft(input), source: "fallback", model: null };
@@ -416,7 +472,7 @@ ${STYLE}`;
 export async function crewChat(input: ChatInput): Promise<ChatOutput> {
   if (env.llmEnabled() && input.memories.length) {
     try {
-      const { output } = await generateText({
+      const { output } = await gen({
         model: lm(input.oneOnOne ? "fast" : "main"),
         system: CHAT_SYSTEM,
         prompt: [
@@ -430,11 +486,12 @@ export async function crewChat(input: ChatInput): Promise<ChatOutput> {
           `CEO: ${input.message}`,
         ].join("\n"),
         output: Output.object({ schema: ChatSchema }),
+        temperature: 0.2,
         abortSignal: patience(45_000),
       });
       return { ...output, source: "llm", model: `${env.llmProvider()}:${input.oneOnOne ? env.llmFastModel() : env.llmModel()}` };
     } catch (e) {
-      console.warn(`[llm] chat fell back: ${(e as Error).message}`);
+      console.warn(`[llm] chat fell back: ${why(e)}`);
     }
   }
   return { ...fallbackChat(input), source: "fallback", model: null };

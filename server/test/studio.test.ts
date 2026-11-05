@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../src/app.ts";
 import { CONTEXT_PRESETS, type ChatResponse, type DraftResponse, type MemoriesResponse, type Room } from "../src/contract.ts";
 import { closeDb, q } from "../src/db.ts";
-import { roomContext } from "../src/llm.ts";
+import { inDomain, roomContext } from "../src/llm.ts";
 import { processQueue } from "../src/memory/keeper.ts";
 import { cleanContextTags } from "../src/rooms.ts";
 import { parseSeedFile } from "../scripts/seed-lib.ts";
@@ -131,6 +131,27 @@ describe("ask the crew", () => {
     expect((await call("POST", `/api/rooms/${room.id}/chat`, { message: "", agent: "all" })).status).toBe(400);
     expect((await call("POST", `/api/rooms/${room.id}/chat`, { message: "hi", agent: "keeper" })).status).toBe(400);
     expect((await call("POST", `/api/rooms/${room.id}/chat`, { message: "hi", agent: "ghost" })).status).toBe(400);
+  });
+});
+
+describe("brief sections stay in their domain", () => {
+  it("drops a line that restates another member's memory, but lets One cite anything", () => {
+    const memories = [
+      { code: "m1", blobId: "b1", text: "[done][x][2026-11-05][by:builder] Merged the deploy path" },
+      { code: "m2", blobId: "b2", text: "[learned][x][2026-11-05][by:researcher] Tatum dropped JSON-RPC" },
+    ];
+    const out = inDomain(
+      [
+        { agent: "one", lines: [{ text: "Cut over next", cites: ["m1"] }] },
+        { agent: "researcher", lines: [{ text: "Learned that we merged the deploy path", cites: ["m1"] }, { text: "Tatum dropped JSON-RPC", cites: ["m2"] }] },
+        { agent: "hippo", lines: [{ text: "Padding", cites: ["m1"] }] },
+      ],
+      memories,
+    );
+    expect(out.map((s) => [s.agent, s.lines.map((l) => l.text)])).toEqual([
+      ["one", ["Cut over next"]],
+      ["researcher", ["Tatum dropped JSON-RPC"]],
+    ]);
   });
 });
 
