@@ -52,6 +52,8 @@ export const env = {
     return read("TELEGRAM_BOT_TOKEN") ? "poll" : "off";
   },
   telegramWebhookSecret: () => read("TELEGRAM_WEBHOOK_SECRET"),
+  /** Optional. Defaults to `${APP_URL}/telegram/webhook`, which the web app proxies to this server. */
+  telegramWebhookUrl: () => read("TELEGRAM_WEBHOOK_URL"),
   /** One-time code the CEO sends as `/start <code>` to bind their Telegram chat. */
   telegramPairCode: () => read("TELEGRAM_PAIR_CODE"),
   appSecret: () => need("APP_SECRET"),

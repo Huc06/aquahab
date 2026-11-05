@@ -69,6 +69,8 @@ pnpm dev                    # API on :8787, scheduler, Telegram long-poll
 
 Then in `web/`: `pnpm dev` (proxies `/api` to `API_ORIGIN`, default `http://localhost:8787`).
 
+Deployed: one Railway project (server, web, Postgres), steps and variables in [`docs/DEPLOY.md`](../docs/DEPLOY.md). `pnpm db:copy` moves the local ledger to the deployed Postgres once, at cut-over.
+
 UI work without mainnet: `MEMORY_MODE=mock AUTH=off pnpm dev`. That is the real API over the SDK's
 in-memory `MemWalMock`; the server refuses both flags when `NODE_ENV=production`.
 
@@ -79,6 +81,7 @@ in-memory `MemWalMock`; the server refuses both flags when `NODE_ENV=production`
 | `pnpm account status \| create \| hire-all \| hire <role> \| fire <role> \| hire-contractor <label> <pubkey>` | the payroll desk, signed by the owner key, submitted through Tatum (`--direct` for Mysten's fullnode) |
 | `pnpm probe` | read-only mainnet checks → `docs/FACTS.md` |
 | `pnpm verify` | every memory on the relayer matched to its Blob object on Sui (namespace and author from Blob metadata) → `docs/PROOF.md` |
+| `pnpm db:copy` | one-time cut-over: copy the local PGlite ledger (rooms, briefs, board, pairing) into `DATABASE_URL` |
 | `pnpm contract:sync` | copy `src/contract.ts` to `web/src/lib/api-types.ts` (CI checks they match) |
 
 ## API
@@ -102,7 +105,8 @@ Shapes: [`src/contract.ts`](src/contract.ts). Reads are public; writes (✱) nee
 | `GET /api/proof` | relayer vs chain counts, per room and per employee |
 | `GET /api/events` | SSE: `memory.queued/stored/failed`, `recall.used { blobIds }`, `brief.created`, `crew.changed` |
 | `POST /api/cron/tick` | scheduler tick for serverless hosts (bearer `CRON_SECRET`) |
-| `POST /telegram/webhook` | Telegram webhook (secret header) |
+| `POST /telegram/webhook` | Telegram webhook (secret header), registered on boot when `TELEGRAM_MODE=webhook`; the web app proxies it |
+| `GET /healthz` | liveness for the host, no outbound calls |
 
 ## Design notes
 
