@@ -160,3 +160,16 @@ Proposed by the backend owner with the backend PR. It overrides §1–§10 where
 10. **One CEO per deployment.** The office is public to read (judges see the real rooms, crew and receipts). Writes need the CEO session, opened from the Telegram bot's `/web` link.
 
 Display names and role titles from §10 are unchanged. Internal ids add `keeper`.
+
+## 12. Telegram bot: buttons first, v3.1 (2026-11-05)
+
+Spec: `docs/features/telegram-bot.md`. This section changes how the bot asks for input. It does not change §11.
+
+1. **New room is a three-step flow.** ＋ New room asks for the name, then the goal (Skip goal), then the times (Use default 08:30 · 21:00, or type `HH:MM HH:MM`, optionally with `private`). The typed `/new Name | goal | times` stays as a shortcut.
+2. **Times are picked, not typed.** `/times` with no arguments and the ⏰ Times button show preset pairs and a "Type my own" option. The default is 08:30 · 21:00, the same value `createRoom` uses.
+3. **Capture uses the §11.2 prefixes.** `d: f: n: done: l: due: s: p:` are the canonical way to file a note. The capture buttons are a shortcut, and onboarding says the prefix works too.
+4. **One command reference.** `/help` and "How to use" show the same reference, built from one list of capture types. `/skip` is advertised with the other commands. `/room` still works but is not advertised.
+
+**Why:** the CEO should not need to know the `|` syntax or the prefixes to get started. Buttons lead, and typed syntax stays for speed.
+
+**How to apply:** new Telegram prompts go through the `Pending` state with a button for every optional field. Do not add a new typed-only option without a matching button.
