@@ -66,6 +66,8 @@ export interface Room {
   id: string;
   slug: string;
   name: string;
+  /** What the CEO is trying to achieve here. Optional. */
+  goal: string | null;
   /** `aquahab:room:<slug>`, or an HMAC alias when `private` (namespace names are public on-chain). */
   namespace: string;
   private: boolean;
@@ -83,6 +85,7 @@ export interface Room {
 export interface CreateRoomRequest {
   slug: string;
   name: string;
+  goal?: string;
   private?: boolean;
   briefAt?: string;
   debriefAt?: string;
@@ -325,3 +328,21 @@ export interface ApiError {
 export const suiscanObject = (id: string) => `https://suiscan.xyz/mainnet/object/${id}`;
 export const suiscanTx = (digest: string) => `https://suiscan.xyz/mainnet/tx/${digest}`;
 export const walruscanBlob = (blobId: string) => `https://walruscan.com/mainnet/blob/${blobId}`;
+
+// ---------- board (derived from the memories the crew has filed) ----------
+
+export type BoardColumn = "backlog" | "blocked" | "decided" | "done";
+
+export interface BoardCard {
+  jobId: string;
+  blobId: string | null;
+  type: MemoryType;
+  text: string;
+  agent: Role;
+  createdAt: string;
+}
+
+export interface BoardResponse {
+  roomId: string;
+  columns: { column: BoardColumn; title: string; cards: BoardCard[] }[];
+}

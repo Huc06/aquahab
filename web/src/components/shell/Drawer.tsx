@@ -6,10 +6,12 @@ import { useHQ, type DrawerKind } from "@/lib/store";
 import { RoomsPanel } from "@/components/rooms/RoomsPanel";
 import { VaultPanel } from "@/components/memory/VaultPanel";
 import { BriefingPanel } from "@/components/briefing/BriefingPanel";
+import { BoardPanel } from "@/components/board/BoardPanel";
 import { ReviewPanel } from "@/components/review/ReviewPanel";
 
 const TITLE: Record<Exclude<DrawerKind, null>, string> = {
   rooms: "Rooms",
+  board: "Board",
   vault: "Memory",
   briefing: "Morning brief",
   agent: "Agent",
@@ -87,6 +89,7 @@ export function Drawer() {
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {drawer === "rooms" && <RoomsPanel />}
+        {drawer === "board" && <BoardPanel />}
         {drawer === "vault" && <VaultPanel />}
         {drawer === "briefing" && <BriefingPanel />}
         {drawer === "agent" && <AgentDetail />}

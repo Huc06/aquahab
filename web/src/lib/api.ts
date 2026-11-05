@@ -5,6 +5,7 @@
 // That is the real API over an in-memory Walrus mock, so the UI never drifts from the contract.
 import type {
   AquahabEvent,
+  BoardResponse,
   Brief,
   BriefFeedbackRequest,
   Candidate,
@@ -53,6 +54,8 @@ export const api = {
   room: (id: string) => call<Room>("GET", `/rooms/${enc(id)}`),
   createRoom: (req: CreateRoomRequest) => call<Room>("POST", "/rooms", req),
   updateRoom: (id: string, req: UpdateRoomRequest) => call<Room>("PATCH", `/rooms/${enc(id)}`, req),
+
+  board: (roomId: string) => call<BoardResponse>("GET", `/rooms/${enc(roomId)}/board`),
 
   latestBrief: (roomId: string) => call<Brief>("GET", `/rooms/${enc(roomId)}/brief/latest`),
   briefs: (roomId: string) => call<Brief[]>("GET", `/rooms/${enc(roomId)}/briefs`),

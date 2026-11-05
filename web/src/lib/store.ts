@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import type { AgentId } from "./types";
 
-export type DrawerKind = "rooms" | "vault" | "briefing" | "agent" | "review" | null;
+export type DrawerKind = "rooms" | "board" | "vault" | "briefing" | "agent" | "review" | null;
 export type ViewKind = "hq" | "city";
 
 // View state only. Business state comes from the crew server (see lib/api.ts).
