@@ -19,7 +19,8 @@
     "probe": "tsx --env-file-if-exists=.env.local scripts/probe.ts",
     "verify": "tsx --env-file-if-exists=.env.local scripts/verify.ts",
     "contract:sync": "node scripts/sync-contract.mjs",
-    "db:copy": "tsx --env-file-if-exists=.env.local scripts/db-copy.ts"
+    "db:copy": "tsx --env-file-if-exists=.env.local scripts/db-copy.ts",
+    "seed-room": "tsx --env-file-if-exists=.env.local scripts/seed-room.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.84",

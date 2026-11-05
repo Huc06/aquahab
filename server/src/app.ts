@@ -2,7 +2,7 @@
 import { Hono, type Context } from "hono";
 import { getBoard } from "./board.ts";
 import { streamSSE } from "hono/streaming";
-import type { ApiError, BriefFeedbackRequest, CaptureRequest, CreateRoomRequest, DebriefRequest, DecideRequest, RecallResponse, UpdateRoomRequest } from "./contract.ts";
+import type { ApiError, BriefFeedbackRequest, CaptureRequest, ChatRequest, DraftRequest, CreateRoomRequest, DebriefRequest, DecideRequest, RecallResponse, UpdateRoomRequest } from "./contract.ts";
 import { MEMORY_TYPES } from "./contract.ts";
 import { env } from "./env.ts";
 import { q } from "./db.ts";
@@ -14,6 +14,7 @@ import { EmptyMemoryError, getJob, retryJob, toJob } from "./memory/keeper.ts";
 import { recall } from "./memory/walrus.ts";
 import { createRoom, getRoom, listRooms, RoomError, updateRoom } from "./rooms.ts";
 import { tick } from "./scheduler.ts";
+import { chat, draft } from "./studio.ts";
 import { acceptUpdate, handleUpdate } from "./telegram.ts";
 import { crewView, healthView, memoriesView, proofView, receiptView } from "./views.ts";
 import { safeEqual } from "./util.ts";
@@ -89,6 +90,9 @@ app.post("/api/briefs/:id/feedback", ceo, async (c) => {
 // ---------- capture and debrief ----------
 app.post("/api/rooms/:id/capture", ceo, async (c) => c.json(await capture(await roomOr404(c), (await body<CaptureRequest>(c)).text ?? ""), 202));
 app.post("/api/rooms/:id/debrief", ceo, async (c) => c.json(await answerDebrief(await roomOr404(c), (await body<DebriefRequest>(c)).text ?? "")));
+// Creator studio. Both recall first and store nothing; the CEO commits a one-line memory through /capture.
+app.post("/api/rooms/:id/draft", ceo, async (c) => c.json(await draft(await roomOr404(c), await body<DraftRequest>(c))));
+app.post("/api/rooms/:id/chat", ceo, async (c) => c.json(await chat(await roomOr404(c), await body<ChatRequest>(c))));
 app.get("/api/rooms/:id/candidates", async (c) => c.json(await listCandidates((await roomOr404(c)).id)));
 app.post("/api/candidates/decide", ceo, async (c) => {
   const req = await body<DecideRequest>(c);
