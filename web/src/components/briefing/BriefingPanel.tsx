@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import type { Brief } from "@/lib/api-types";
 import { CREW } from "@/lib/api-types";
 import { useActiveRoom, useApi } from "@/lib/useApi";
+import { BlobReceiptPopover } from "@/components/receipt/BlobReceiptPopover";
 
 const button = "rounded-md border border-line px-3 py-1 text-sm text-fg focus-visible:outline-focus disabled:opacity-40";
 
@@ -61,9 +62,11 @@ export function BriefingPanel() {
                 {s.lines.map((line, i) => (
                   <li key={i}>
                     {line.text}
-                    {line.cites.length > 0 && (
-                      <span className="ml-1 font-mono text-[12px] text-fg-3">[{line.cites.length} memories]</span>
-                    )}
+                    {line.cites.map((blobId) => (
+                      <span key={blobId} className="ml-1">
+                        <BlobReceiptPopover blobId={blobId} />
+                      </span>
+                    ))}
                   </li>
                 ))}
               </ul>
