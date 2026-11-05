@@ -50,7 +50,10 @@ Variables. John enters the values from his `server/.env.local`; they never go in
 | `TELEGRAM_MODE` | `webhook` |
 | `APP_URL` | `https://<the web service's public domain>` |
 | `CEO_TIMEZONE` | `Asia/Ho_Chi_Minh` |
-| `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | once the LLM is chosen (`server/.env.example`) |
+| `LLM_PROVIDER` | `openai-compatible` |
+| `LLM_BASE_URL` | `https://api.groq.com/openai/v1` |
+| `LLM_API_KEY` | the Groq key, from `.env.local` |
+| `LLM_MODEL`, `LLM_FAST_MODEL` | `openai/gpt-oss-120b`, `openai/gpt-oss-20b` (both support `json_schema` structured outputs on Groq) |
 
 Never set on Railway: `MEMORY_MODE`, `AUTH`, `SCHEDULER=off`, `TELEGRAM_WEBHOOK_URL` (not needed), or the owner
 key (`.env.owner.local` stays offline; it is only for `pnpm account`).

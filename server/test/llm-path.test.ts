@@ -8,6 +8,7 @@ import type { ChatResponse, DraftResponse, MemoriesResponse, Room } from "../src
 
 const seen: { system: string; user: string; format: any; model: string }[] = [];
 let server: Server;
+let flakyFailed = false;
 
 function reply(content: unknown) {
   return {
@@ -30,6 +31,12 @@ beforeAll(async () => {
       const user = body.messages.find((m: any) => m.role === "user")?.content ?? "";
       const text = typeof user === "string" ? user : user.map((p: any) => p.text).join("");
       seen.push({ system, user: text, format: body.response_format, model: body.model });
+      if (text.includes("Idea: flaky") && !flakyFailed) {
+        // What Groq answers when a sample fails the schema.
+        flakyFailed = true;
+        res.writeHead(400, { "content-type": "application/json" });
+        return res.end(JSON.stringify({ error: { message: "Failed to generate JSON. Please adjust your prompt.", type: "invalid_request_error", code: "json_validate_failed" } }));
+      }
       let out: unknown = {};
       if (system.includes("You draft a post")) out = { draft: "Everyone says models are the moat. [your number] says otherwise.", follow: ["m1", "m42"], avoid: ["m2"] };
       else if (system.includes("The CEO asks the crew")) {
@@ -119,6 +126,14 @@ describe("LLM path (OpenAI-compatible provider)", () => {
     expect(r.json.proposal).toEqual({ type: "decision", agent: "one", text: "Keep Tatum GraphQL for events", capture: "d: Keep Tatum GraphQL for events" });
     const req = seen.filter((s) => s.system.includes("The CEO asks the crew")).at(-1)!;
     expect(req.user).toMatch(/Who answers: one, builder$/m);
+  });
+
+  it("retries once when the provider rejects a sample (json_validate_failed)", async () => {
+    const before = seen.length;
+    const r = await call<DraftResponse>("POST", `/api/rooms/${room.id}/draft`, { idea: "flaky" });
+    expect(flakyFailed).toBe(true);
+    expect(r.json.source).toBe("llm");
+    expect(seen.length - before).toBe(2);
   });
 
   it("uses the fast model one-on-one", async () => {
