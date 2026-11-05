@@ -3,6 +3,7 @@
 //   any time  `d:` `f:` `n:` quick capture, or a free note the crew turns into proposals
 //   evening   the debrief question; the reply becomes proposals the CEO keeps or drops
 // One CEO per deployment: the first chat that sends `/start <pair code>` is bound, everyone else is refused.
+import { timingSafeEqual } from "node:crypto";
 import { CREW, walruscanBlob, type Brief, type Candidate, type MemoryJob, type Room } from "./contract.ts";
 import { env } from "./env.ts";
 import { getSetting, q, setSetting } from "./db.ts";
@@ -182,12 +183,19 @@ const HELP = [
   "/ask question · /memories · /crew · /times 08:30 21:00 · /web",
 ].join("\n");
 
+function safeEqual(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
 async function bind(chatId: number, text: string): Promise<boolean> {
   const bound = await ceoChat();
   if (bound === chatId) return true;
   const code = env.telegramPairCode();
-  const given = text.split(/\s+/)[1];
-  if (!bound && (!code || given === code)) {
+  if (!code) return false; // refuse to pair without a configured secret: fail closed
+  const given = text.split(/\s+/)[1] ?? "";
+  if (!bound && safeEqual(given, code)) {
     await setSetting("telegram.chat", chatId);
     return true;
   }

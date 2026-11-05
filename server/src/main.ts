@@ -19,7 +19,8 @@ await db();
 if (isMock() && process.env.MOCK_SEED === "1") await seedMock();
 watchStored();
 if (env.schedulerEnabled()) startScheduler();
-if (env.telegramMode() === "poll") await startPolling().catch((e) => console.warn(`[telegram] ${(e as Error).message}`));
+if (env.telegramMode() === "poll" && !env.telegramPairCode()) console.warn("[telegram] TELEGRAM_PAIR_CODE is not set: the bot stays off until it is.");
+else if (env.telegramMode() === "poll") await startPolling().catch((e) => console.warn(`[telegram] ${(e as Error).message}`));
 
 serve({ fetch: app.fetch, port: env.port() }, (info) => {
   console.log(`Aquahab crew server on http://localhost:${info.port}`);
