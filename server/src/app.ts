@@ -137,8 +137,12 @@ app.get("/api/crew", async (c) => c.json(await crewView()));
 app.get("/api/proof", async (c) => c.json(await proofView()));
 
 // ---------- live events ----------
-app.get("/api/events", (c) =>
-  streamSSE(c, async (stream) => {
+// The office reads this through the web app's proxy. Next gzips a proxied response unless it says no-transform
+// (the events then sit in the gzip buffer), and it sends no headers before the first body byte: hence the header
+// and the comment the stream opens with.
+app.get("/api/events", (c) => {
+  const res = streamSSE(c, async (stream) => {
+    await stream.write(": open\n\n");
     let last = Number(c.req.header("last-event-id") ?? c.req.query("since") ?? (await lastEventId()));
     const flush = async () => {
       for (const { id, event } of await eventsSince(last)) {
@@ -155,8 +159,10 @@ app.get("/api/events", (c) =>
       await Promise.race([new Promise<void>((r) => (wake = r)), stream.sleep(2000)]);
     }
     unsub();
-  }),
-);
+  });
+  res.headers.set("Cache-Control", "no-cache, no-transform");
+  return res;
+});
 
 // ---------- scheduler and Telegram ----------
 app.post("/api/cron/tick", async (c) => {
