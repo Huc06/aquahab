@@ -439,7 +439,15 @@ let polling = false;
 export async function startPolling() {
   if (polling || !env.telegramToken()) return;
   polling = true;
-  await tg("deleteWebhook", { drop_pending_updates: false });
+  try {
+    await tg("deleteWebhook", { drop_pending_updates: false });
+  } catch (e) {
+    // A network blip at boot must not leave the bot dead: reset the flag and try again.
+    polling = false;
+    console.warn(`[telegram] ${(e as Error).message}; retrying in 15s`);
+    setTimeout(() => void startPolling(), 15_000);
+    return;
+  }
   await tg("setMyCommands", {
     commands: [
       { command: "brief", description: "Brief me on the current room now" },
