@@ -327,6 +327,25 @@ async function handleMenu(chatId: number, messageId: number, action: string) {
   }
 }
 
+/** `/new Name | goal | 07:45 20:30`: the goal and the times are optional, in that order. */
+export function parseNewRoom(arg: string): { name: string; goal?: string; briefAt?: string; debriefAt?: string; private: boolean } {
+  const isPrivate = /\bprivate\b/i.test(arg);
+  const parts = arg.replace(/\bprivate\b/i, "").split("|").map((p) => p.trim()).filter((p) => p.length > 0);
+  const name = parts[0] ?? "";
+  let rest = parts.slice(1);
+  let briefAt: string | undefined;
+  let debriefAt: string | undefined;
+  const last = rest[rest.length - 1];
+  const times = last?.match(/^(\d{1,2}:\d{2})(?:\s+(\d{1,2}:\d{2}))?$/);
+  if (times) {
+    briefAt = times[1];
+    debriefAt = times[2];
+    rest = rest.slice(0, -1);
+  }
+  const goal = rest.join(" | ") || undefined;
+  return { name, goal, briefAt, debriefAt, private: isPrivate };
+}
+
 async function handleText(chatId: number, messageId: number, text: string, replyTo: number | null) {
   const t = text.trim();
   if (t.startsWith("/start")) {
@@ -345,11 +364,10 @@ async function handleText(chatId: number, messageId: number, text: string, reply
     case "/menu":
       return void (await showMenu(chatId));
     case "/new": {
-      if (!arg) return void (await send(chatId, "Name the project: <code>/new Aquahab</code> (add <code>private</code> to hide its name on-chain)."));
-      const isPrivate = /\bprivate\b/i.test(arg);
-      const name = arg.replace(/\bprivate\b/i, "").trim();
+      const room0 = parseNewRoom(arg);
+      if (!room0.name) return void (await send(chatId, "Name the project: <code>/new Aquahab | what you are trying to achieve | 07:45 20:30</code>. The goal and the times are optional; add <code>private</code> to hide the name on-chain."));
       try {
-        const r = await createRoom({ slug: name, name, private: isPrivate });
+        const r = await createRoom({ slug: room0.name, name: room0.name, goal: room0.goal, briefAt: room0.briefAt, debriefAt: room0.debriefAt, private: room0.private });
         await setSetting("telegram.room", r.id);
         await send(chatId, `Room <b>${esc(r.name)}</b> is open. Namespace <code>${esc(r.namespace)}</code>. Brief ${r.briefAt}, debrief ${r.debriefAt}.`);
         const b = await runBrief(r, "day-one");
