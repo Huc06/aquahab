@@ -1,4 +1,5 @@
-// Postgres everywhere: PGlite (embedded) for local development and tests, Neon when DATABASE_URL is set.
+// Postgres everywhere: PGlite (embedded) for local development and tests; DATABASE_URL (Railway Postgres
+// through node-postgres, or Neon through its HTTP driver) when deployed.
 // The database is the server's ledger and cache. Walrus Memory stays the source of truth for memories.
 import { mkdirSync } from "node:fs";
 import { env } from "./env.ts";
@@ -14,10 +15,21 @@ let ready: Promise<void> | null = null;
 
 async function connect(): Promise<Driver> {
   const url = env.databaseUrl();
-  if (url) {
+  // Neon's HTTP driver speaks only to Neon. Any other Postgres (Railway, local) goes through node-postgres.
+  if (url && /\.neon\.tech\b/.test(url)) {
     const { neon } = await import("@neondatabase/serverless");
     const sql = neon(url);
     return { query: async (text, params = []) => (await sql.query(text, params as any[])) as Row[] };
+  }
+  if (url) {
+    const { default: pg } = await import("pg");
+    pg.types.setTypeParser(20, (v: string) => Number(v)); // int8 counts and ids as numbers, like PGlite
+    const pool = new pg.Pool({ connectionString: url, max: 5 });
+    pool.on("error", (e) => console.warn(`[db] idle client error: ${e.message}`));
+    return {
+      query: async (text, params = []) => (await pool.query(text, params as any[])).rows as Row[],
+      close: () => pool.end(),
+    };
   }
   const { PGlite } = await import("@electric-sql/pglite");
   const dir = env.pgliteDir();

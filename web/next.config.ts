@@ -16,8 +16,14 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // The proxy's default 30 s cut-off would end a brief or a debrief mid-recall, and every /api/events stream.
+  experimental: { proxyTimeout: 300_000 },
   async rewrites() {
-    return [{ source: "/api/:path*", destination: `${API_ORIGIN}/api/:path*` }];
+    return [
+      { source: "/api/:path*", destination: `${API_ORIGIN}/api/:path*` },
+      // Telegram posts here, so the office domain is the only public one the crew server needs.
+      { source: "/telegram/webhook", destination: `${API_ORIGIN}/telegram/webhook` },
+    ];
   },
 };
 

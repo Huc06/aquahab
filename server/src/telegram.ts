@@ -688,6 +688,54 @@ export async function handleUpdate(u: any) {
 
 let polling = false;
 
+const COMMANDS = [
+  { command: "brief", description: "Brief me on the current room now" },
+  { command: "debrief", description: "Start tonight's debrief now" },
+  { command: "rooms", description: "Switch room" },
+  { command: "new", description: "Open a room for a project" },
+  { command: "ask", description: "Ask the room's memory" },
+  { command: "memories", description: "Latest memories in this room" },
+  { command: "crew", description: "Who works here (from Sui)" },
+  { command: "times", description: "Set brief and debrief times" },
+  { command: "skip", description: "Skip tonight's debrief" },
+  { command: "web", description: "Open the office" },
+  { command: "menu", description: "Open the menu" },
+  { command: "help", description: "How to use the crew" },
+];
+
+/** Where Telegram posts updates: TELEGRAM_WEBHOOK_URL, else the office's own proxy at APP_URL. */
+export function webhookUrl(): string {
+  return env.telegramWebhookUrl() ?? `${env.appUrl().replace(/\/+$/, "")}/telegram/webhook`;
+}
+
+/** Deployed: register the webhook (and the command list) with Telegram on every boot. */
+export async function startWebhook(): Promise<void> {
+  if (!env.telegramToken()) return;
+  const secret = env.telegramWebhookSecret();
+  const url = webhookUrl();
+  if (!secret) return void console.warn("[telegram] TELEGRAM_WEBHOOK_SECRET is not set: the webhook stays off.");
+  if (!url.startsWith("https://")) return void console.warn(`[telegram] the webhook needs an https URL, got ${url}: set APP_URL or TELEGRAM_WEBHOOK_URL.`);
+  try {
+    await tg("setWebhook", { url, secret_token: secret, allowed_updates: ["message", "callback_query"], drop_pending_updates: false });
+  } catch (e) {
+    console.warn(`[telegram] setWebhook: ${(e as Error).message}; retrying in 15s`);
+    setTimeout(() => void startWebhook(), 15_000);
+    return;
+  }
+  await tg("setMyCommands", { commands: COMMANDS }).catch(() => {});
+  console.log(`[telegram] webhook set to ${url}`);
+}
+
+// Telegram resends an update when the webhook answers late, so answer at once and drop repeats.
+const seenUpdates = new Set<number>();
+export function acceptUpdate(u: { update_id?: number }): boolean {
+  if (typeof u.update_id !== "number") return true;
+  if (seenUpdates.has(u.update_id)) return false;
+  seenUpdates.add(u.update_id);
+  if (seenUpdates.size > 500) seenUpdates.delete(seenUpdates.values().next().value!);
+  return true;
+}
+
 /** Local development: long-poll getUpdates (removes any webhook first). */
 export async function startPolling() {
   if (polling || !env.telegramToken()) return;
@@ -701,22 +749,7 @@ export async function startPolling() {
     setTimeout(() => void startPolling(), 15_000);
     return;
   }
-  await tg("setMyCommands", {
-    commands: [
-      { command: "brief", description: "Brief me on the current room now" },
-      { command: "debrief", description: "Start tonight's debrief now" },
-      { command: "rooms", description: "Switch room" },
-      { command: "new", description: "Open a room for a project" },
-      { command: "ask", description: "Ask the room's memory" },
-      { command: "memories", description: "Latest memories in this room" },
-      { command: "crew", description: "Who works here (from Sui)" },
-      { command: "times", description: "Set brief and debrief times" },
-      { command: "skip", description: "Skip tonight's debrief" },
-      { command: "web", description: "Open the office" },
-      { command: "menu", description: "Open the menu" },
-      { command: "help", description: "How to use the crew" },
-    ],
-  }).catch(() => {});
+  await tg("setMyCommands", { commands: COMMANDS }).catch(() => {});
   let offset = (await getSetting<number>("telegram.offset")) ?? 0;
   console.log("[telegram] polling for updates");
   void (async () => {

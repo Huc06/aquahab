@@ -5,7 +5,7 @@ import { app } from "./app.ts";
 import { env } from "./env.ts";
 import { db } from "./db.ts";
 import { startScheduler } from "./scheduler.ts";
-import { startPolling, watchStored } from "./telegram.ts";
+import { startPolling, startWebhook, watchStored } from "./telegram.ts";
 import { hiredRoles, isMock } from "./memory/walrus.ts";
 import { seedMock } from "./mock-seed.ts";
 
@@ -13,14 +13,17 @@ import { seedMock } from "./mock-seed.ts";
 if (process.env.NODE_ENV === "production") {
   if (env.memoryMode() === "mock") throw new Error("MEMORY_MODE=mock is for local development only. Refusing to start in production.");
   if (process.env.AUTH === "off") throw new Error("AUTH=off is for local development only. Refusing to start in production.");
+  // PGlite on a container disk is lost on every redeploy, and with it the rooms, briefs and board.
+  if (!env.databaseUrl()) throw new Error("DATABASE_URL is required in production (Postgres). PGlite is for local development only.");
 }
 
 await db();
 if (isMock() && process.env.MOCK_SEED === "1") await seedMock();
 watchStored();
 if (env.schedulerEnabled()) startScheduler();
-if (env.telegramMode() === "poll" && !env.telegramPairCode()) console.warn("[telegram] TELEGRAM_PAIR_CODE is not set: the bot stays off until it is.");
+if (env.telegramMode() !== "off" && !env.telegramPairCode()) console.warn("[telegram] TELEGRAM_PAIR_CODE is not set: the bot stays off until it is.");
 else if (env.telegramMode() === "poll") await startPolling().catch((e) => console.warn(`[telegram] ${(e as Error).message}`));
+else if (env.telegramMode() === "webhook") await startWebhook().catch((e) => console.warn(`[telegram] ${(e as Error).message}`));
 
 serve({ fetch: app.fetch, port: env.port() }, (info) => {
   console.log(`Aquahab crew server on http://localhost:${info.port}`);

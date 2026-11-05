@@ -14,7 +14,7 @@ import { EmptyMemoryError, getJob, retryJob, toJob } from "./memory/keeper.ts";
 import { recall } from "./memory/walrus.ts";
 import { createRoom, getRoom, listRooms, RoomError, updateRoom } from "./rooms.ts";
 import { tick } from "./scheduler.ts";
-import { handleUpdate } from "./telegram.ts";
+import { acceptUpdate, handleUpdate } from "./telegram.ts";
 import { crewView, healthView, memoriesView, proofView, receiptView } from "./views.ts";
 import { safeEqual } from "./util.ts";
 
@@ -165,8 +165,13 @@ app.post("/api/cron/tick", async (c) => {
 app.post("/telegram/webhook", async (c) => {
   const secret = env.telegramWebhookSecret();
   if (!secret || !safeEqual(c.req.header("x-telegram-bot-api-secret-token") ?? "", secret)) return fail(c, 403, "Forbidden");
-  await handleUpdate(await c.req.json());
+  const update = await c.req.json();
+  // A brief can take longer than Telegram waits; handle it after answering so Telegram does not resend.
+  if (acceptUpdate(update)) void handleUpdate(update);
   return c.json({ ok: true });
 });
+
+// Liveness for the host (Railway health check): no Walrus, Tatum or database call.
+app.get("/healthz", (c) => c.json({ ok: true }));
 
 app.get("/", (c) => c.text("Aquahab crew server. API under /api, contract in server/src/contract.ts."));

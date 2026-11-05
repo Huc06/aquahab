@@ -18,8 +18,8 @@
     "account": "tsx --env-file-if-exists=.env.local scripts/account.ts",
     "probe": "tsx --env-file-if-exists=.env.local scripts/probe.ts",
     "verify": "tsx --env-file-if-exists=.env.local scripts/verify.ts",
-    "telegram:poll": "tsx --env-file-if-exists=.env.local scripts/telegram-poll.ts",
-    "contract:sync": "node scripts/sync-contract.mjs"
+    "contract:sync": "node scripts/sync-contract.mjs",
+    "db:copy": "tsx --env-file-if-exists=.env.local scripts/db-copy.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.84",
@@ -34,12 +34,14 @@
     "@protobuf-ts/grpc-transport": "2.11.1",
     "ai": "^7.0.162",
     "hono": "^4.13.16",
+    "pg": "^8.23.1",
+    "tsx": "^4.23.15",
     "undici": "^8.12.3",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
-    "tsx": "^4.23.15",
+    "@types/pg": "^8.23.1",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   },
