@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { api } from "@/lib/api";
-import { MUSIC_SRC } from "@/lib/music";
+import { startAmbient } from "@/lib/ambient";
 import { useHQ } from "@/lib/store";
 import { useApi } from "@/lib/useApi";
 
@@ -10,16 +10,17 @@ import { useApi } from "@/lib/useApi";
 export function BottomBar() {
   const musicOn = useHQ((s) => s.musicOn);
   const setMusicOn = useHQ((s) => s.setMusicOn);
-  const audioRef = useRef<HTMLAudioElement>(null);
 
+  // Ambience plays only while the toggle is on. Turning it off, or leaving the page, stops it.
   useEffect(() => {
-    const a = audioRef.current;
-    if (!a || !MUSIC_SRC) return;
-    if (musicOn) void a.play().catch(() => setMusicOn(false));
-    else a.pause();
+    if (!musicOn) return;
+    const ambient = startAmbient();
+    if (!ambient) {
+      setMusicOn(false);
+      return;
+    }
+    return () => ambient.stop();
   }, [musicOn, setMusicOn]);
-
-  const noTrack = !MUSIC_SRC;
 
   // Status from the crew server: relayer writes, Tatum reads, and the write queue. Refreshed every 15 s.
   const health = useApi(() => api.health(), []);
@@ -45,14 +46,12 @@ export function BottomBar() {
       <button
         type="button"
         aria-pressed={musicOn}
-        disabled={noTrack}
-        title={noTrack ? "No track added yet" : musicOn ? "Turn music off" : "Turn music on"}
+        title={musicOn ? "Turn music off" : "Turn music on"}
         onClick={() => setMusicOn(!musicOn)}
-        className="ml-auto rounded-sm border border-line px-2 py-0.5 font-sans text-xs text-fg-2 enabled:hover:border-mem disabled:opacity-50 focus-visible:outline-focus"
+        className="ml-auto rounded-sm border border-line px-2 py-0.5 font-sans text-xs text-fg-2 enabled:hover:border-mem focus-visible:outline-focus"
       >
-        {noTrack ? "Music: no track" : musicOn ? "Music on" : "Music off"}
+        {musicOn ? "Music on" : "Music off"}
       </button>
-      {MUSIC_SRC && <audio ref={audioRef} src={MUSIC_SRC} loop preload="none" />}
     </footer>
   );
 }

@@ -7,6 +7,26 @@
 import type { AgentId } from "./types";
 
 export const OFFICE_Y = 0; // office origin sits on the floor plane
+export const OFFICE_HALF = 0.95; // the office spans about ±0.95 on x and z
+
+// Crew movement. Each member roams within ROAM_RADIUS of its desk, walks at WALK_SPEED office units per second,
+// and pauses between trips for PAUSE_MIN_S plus up to PAUSE_EXTRA_S seconds.
+export const ROAM_RADIUS = 0.3;
+export const WALK_SPEED = 0.12;
+export const PAUSE_MIN_S = 2;
+export const PAUSE_EXTRA_S = 4;
+
+// Entrance: each member rises out of the floor one after another, then starts roaming.
+export const ENTRANCE_DELAY_S = 0.8; // before the first member starts to rise
+export const ENTRANCE_STAGGER_S = 0.7; // between members
+export const ENTRANCE_RISE_S = 1.2; // one member's rise
+export const ENTRANCE_DEPTH = 0.3; // how far below the floor a member starts, office units
+export const WALK_ANIMATION = "Walking";
+
+// Office objects are found from the geometry and numbered in scan order. Until a name is set here,
+// hovering one shows "Object N" (N counts from 1). Fill in the names once each object is identified.
+export const OBJECT_NAMES: Record<number, string> = {};
+export const OBJECT_LABEL_HEIGHT = 0.35;
 export const FLOOR_Y = -0.12; // floor min-Y measured in the composition study
 
 export interface DeskSpot {
