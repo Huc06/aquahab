@@ -7,6 +7,18 @@ Companion: `DESIGN.md` §2.5 (scene palette), §5.2 (layout), §6.3 (desk labels
 
 Give the CEO one readable office on the seabed. Five fixed desks, One at the center, the Memory Vault at the front. Desk screens and routing lines show live state. Recall chips travel from the Vault to a desk. The scene is decoration plus state, never the only place where information lives. Every fact in the scene is also in a text panel.
 
+## Current build (6 Nov 2026)
+
+What the office does on `main` now. Where this differs from the sections below, this section wins (DECISIONS §13).
+
+- **Crew from the server.** Labels and the agent tabs come from `GET /api/crew` (`web/src/lib/useCrew.ts`). The server reports role, name, title, memory count and whether the member is employed. It does not report task or status, so the labels show the title and the memory count. Vacant desks stay empty.
+- **Roaming.** Each member roams within `ROAM_RADIUS` of its desk. Paths come from the office geometry (`web/src/lib/hq-nav.ts`), so they keep clear of desks, chairs, the Vault and plants. Walking plays the `Walking` clip; standing still plays the desk idle.
+- **Entrance.** Members rise out of the floor one after another, then start roaming (`ENTRANCE_*` in `hq-layout.ts`). Labels fade in with the rise.
+- **Speech.** The crew plays the room's latest standup when there is one, otherwise the small talk in `banter.ts`. Each line shows under the speaker's name and title.
+- **Office objects.** Hovering an office object shows a caption. Objects come from the geometry and are numbered `Object N` until named in `OBJECT_NAMES`.
+- **Music.** A generated ambient drone, toggled from the bottom bar (`web/src/lib/ambient.ts`). No audio file is used.
+- **Superseded below:** fixed idle figures at desks, desk screen colours from `AgentStatus`, and the `mock.ts` data source. The desk layout table and camera are still the reference for the desk positions.
+
 ## Build approach
 
 - **Code, not a design tool.** The scene is written with React Three Fiber, Drei, and Zustand (RESHADED V1 stack). Design tools only produce reference images. The numbers in this spec are the source.

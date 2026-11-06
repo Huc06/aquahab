@@ -2,10 +2,14 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
-import type { Brief } from "@/lib/api-types";
+import type { Brief, Role } from "@/lib/api-types";
 import { CREW } from "@/lib/api-types";
 import { useActiveRoom, useApi } from "@/lib/useApi";
 import { BlobReceiptPopover } from "@/components/receipt/BlobReceiptPopover";
+import { DraftModal } from "@/components/draft/DraftModal";
+
+// Members whose lines can be turned into a draft (the voice, the plan and the research lanes).
+const DRAFTABLE: Role[] = ["one", "lofi", "researcher"];
 
 const button = "rounded-md border border-line px-3 py-1 text-sm text-fg focus-visible:outline-focus disabled:opacity-40";
 
@@ -16,6 +20,7 @@ export function BriefingPanel() {
   const brief = useApi(roomId ? () => api.latestBrief(roomId) : null, [roomId]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [drafting, setDrafting] = useState<{ idea: string; agent: Role } | null>(null);
 
   if (roomLoading) return <p className="text-sm text-fg-3">Loading…</p>;
   if (!room) return <p className="text-sm text-fg-3">Create a room first.</p>;
@@ -67,6 +72,15 @@ export function BriefingPanel() {
                         <BlobReceiptPopover blobId={blobId} />
                       </span>
                     ))}
+                    {DRAFTABLE.includes(s.agent) && (
+                      <button
+                        type="button"
+                        className="ml-2 rounded-sm border border-line px-1.5 py-0.5 text-[12px] text-fg-2 focus-visible:outline-focus"
+                        onClick={() => setDrafting({ idea: line.text, agent: s.agent })}
+                      >
+                        ✍ Draft
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -87,6 +101,9 @@ export function BriefingPanel() {
         {busy ? "Writing brief…" : "Run brief now"}
       </button>
       {message && <p role="alert" className="text-bad">{message}</p>}
+      {drafting && (
+        <DraftModal roomId={room.id} roomName={room.name} idea={drafting.idea} agent={drafting.agent} onClose={() => setDrafting(null)} />
+      )}
     </div>
   );
 }

@@ -5,7 +5,8 @@ import { Html, OrbitControls, PerspectiveCamera, useAnimations, useGLTF } from "
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { AGENTS } from "@/lib/mock";
+import { CREW, type CrewMember } from "@/lib/api-types";
+import { useCrew } from "@/lib/useCrew";
 import {
   CAMERA,
   CREW_ANIMATION,
@@ -28,7 +29,6 @@ import {
 import { useBanter } from "@/lib/banter";
 import { cellOf, findPath, navFor, objectAt, objectsOf, pickTarget, worldOf, type NavGrid, type ObjectCluster } from "@/lib/hq-nav";
 import { useHQ } from "@/lib/store";
-import type { Agent, AgentStatus } from "@/lib/types";
 import { useActiveRoom } from "@/lib/useApi";
 import { retint } from "@/lib/materials";
 
@@ -38,14 +38,6 @@ const CAPTAIN_URL = "/models/captain.glb";
 useGLTF.preload(OFFICE_URL);
 useGLTF.preload(CAPTAIN_URL);
 
-const STATUS_LABEL: Record<AgentStatus, string> = {
-  idle: "Idle",
-  assigned: "Assigned",
-  working: "Working",
-  review: "Ready for review",
-  blocked: "Blocked",
-  offline: "Offline",
-};
 
 // The office model. Hovering an object shows its caption, from OBJECT_NAMES or "Object N".
 function Office() {
@@ -74,7 +66,7 @@ function Office() {
 
 interface CrewMemberProps {
   spot: DeskSpot;
-  agent: Agent;
+  member: CrewMember;
   model: THREE.Object3D;
   animations: THREE.AnimationClip[];
   nav: NavGrid;
@@ -83,6 +75,7 @@ interface CrewMemberProps {
   selected: boolean;
   chat: string | null; // the line of small talk, when this member is the speaker
   order: number; // position in the entrance
+  contextTag: string | null; // the room's label for this member, e.g. "Brand Voice"
   onSelect: () => void;
 }
 
@@ -97,7 +90,7 @@ interface Roam {
 
 // One crew member. Each member gets its own skinned clone, so each one animates on its own.
 // It roams within ROAM_RADIUS of its desk, along a path that avoids every object in the office.
-function CrewMember({ spot, agent, model, animations, nav, scale, baseY, selected, chat, order, onSelect }: CrewMemberProps) {
+function CrewMember({ spot, member, model, animations, nav, scale, baseY, selected, chat, order, contextTag, onSelect }: CrewMemberProps) {
   const rootRef = useRef<THREE.Group>(null);
   const labelRef = useRef<THREE.Group>(null);
   const tagRef = useRef<HTMLDivElement>(null);
@@ -206,10 +199,11 @@ function CrewMember({ spot, agent, model, animations, nav, scale, baseY, selecte
             }`}
           >
             <p className="whitespace-nowrap">
-              <span className="font-semibold text-agent">{agent.name}</span>
+              <span className="font-semibold text-agent">{member.name}</span>
+              {contextTag && <span className="ml-1.5 rounded-sm border border-line px-1 text-[11px] text-mem">{contextTag}</span>}
               <span className="ml-2 text-fg-2">
-                {STATUS_LABEL[agent.status]}
-                {agent.currentTask ? ` · ${agent.currentTask}` : ""}
+                {member.title ? `${member.title} · ` : ""}
+                {member.memoryCount} memories
               </span>
             </p>
             {chat && <p className="mt-1 text-fg">{chat}</p>}
@@ -237,19 +231,23 @@ function Crew() {
     return { scale: s, baseY: FLOOR_Y - box.min.y * s };
   }, [prepared]);
 
-  const agentById = useMemo(() => Object.fromEntries(AGENTS.map((a) => [a.id, a])), []);
+  const { byRole } = useCrew();
   const { room } = useActiveRoom();
   const banter = useBanter(room?.id ?? null);
   // A standup turn that answers another member names them first.
-  const line = banter.to ? `@${agentById[banter.to]?.name ?? banter.to} ${banter.text}` : banter.text;
+  const line = banter.to ? `@${CREW[banter.to].name} ${banter.text}` : banter.text;
 
   return (
     <>
-      {DESK_SPOTS.map((spot, order) => (
+      {/* A desk with nobody on the crew stays empty. `order` keeps each member's place in the entrance. */}
+      {DESK_SPOTS.map((spot, order) => {
+        const member = byRole.get(spot.id);
+        if (!member) return null;
+        return (
         <CrewMember
           key={spot.id}
           spot={spot}
-          agent={agentById[spot.id]}
+          member={member}
           model={prepared}
           animations={animations}
           nav={nav}
@@ -258,9 +256,11 @@ function Crew() {
           selected={selectedAgent === spot.id}
           chat={banter.speaker === spot.id ? line : null}
           order={order}
+          contextTag={room?.contextTags?.[spot.id] ?? null}
           onSelect={() => selectAgent(spot.id)}
         />
-      ))}
+        );
+      })}
     </>
   );
 }

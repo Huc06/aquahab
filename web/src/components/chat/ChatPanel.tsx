@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { MemoryJob } from "@/lib/api-types";
+import { AskTheCrew } from "@/components/chat/AskTheCrew";
 import { useHQ } from "@/lib/store";
 import { useActiveRoom, watchJob } from "@/lib/useApi";
 
@@ -16,6 +17,7 @@ export function ChatPanel() {
   const setOpen = useHQ((s) => s.setChatOpen);
   const { room } = useActiveRoom();
   const [draft, setDraft] = useState("");
+  const [mode, setMode] = useState<"capture" | "ask">("capture");
   const [messages, setMessages] = useState<Message[]>([{ id: 0, from: "crew", text: HINT }]);
   const nextId = useRef(1);
   const cancels = useRef<(() => void)[]>([]);
@@ -82,6 +84,25 @@ export function ChatPanel() {
             </button>
           </header>
 
+          <div role="tablist" aria-label="Chat mode" className="flex gap-1.5 border-b border-line-decor px-3 py-2 text-sm">
+            {(["capture", "ask"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => setMode(m)}
+                className={`rounded-sm border px-3 py-1 focus-visible:outline-focus ${mode === m ? "border-mem bg-raised text-fg" : "border-transparent text-fg-2 hover:border-line"}`}
+              >
+                {m === "capture" ? "Quick Capture" : "Ask the Crew"}
+              </button>
+            ))}
+          </div>
+
+          {mode === "ask" && room ? (
+            <AskTheCrew roomId={room.id} roomName={room.name} />
+          ) : (
+          <>
           <ol className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 text-sm" aria-live="polite">
             {messages.map((m) => (
               <li key={m.id} className={m.from === "ceo" ? "ml-10 rounded-md bg-raised px-3 py-2 text-fg" : "mr-10 px-3 py-2 text-fg-2"}>
@@ -111,6 +132,8 @@ export function ChatPanel() {
               Send
             </button>
           </form>
+          </>
+          )}
         </section>
       )}
     </>
