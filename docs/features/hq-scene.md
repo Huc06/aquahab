@@ -113,6 +113,7 @@ Colors are DESIGN.md Appendix A tokens. They are never the only signal: the desk
 - **Store:** Zustand holds view state only: selected desk, camera mode, reduced-motion flag, scene mode (3D or 2D fallback). Business state comes from the API.
 - **Entities:** `Agent` (`deskPosition`, `status`), `Task`, `RecallEvent` (`memoryIds`, `skipped`), `AquahabMemory` (`writeStatus`).
 - Desk positions are read from the layout table above, not from the database. The `deskPosition` values in `DATA_MODEL.md` §4.4 are superseded by this table.
+- **Speech bubbles:** `GET /api/rooms/:id/standup/latest`, reloaded on `standup.created`. The crew plays the room's latest standup (turns that cite blobs, see `crew-standup.md`); until there is one, the fixed small talk in `web/src/lib/banter.ts`.
 
 ## Walrus Memory Usage
 

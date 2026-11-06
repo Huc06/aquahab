@@ -19,6 +19,7 @@ import type {
   ProofResponse,
   RecallResponse,
   Room,
+  Standup,
   UpdateRoomRequest,
 } from "./api-types";
 
@@ -62,6 +63,11 @@ export const api = {
   runBrief: (roomId: string) => call<Brief>("POST", `/rooms/${enc(roomId)}/brief`),
   rateBrief: (briefId: string, req: BriefFeedbackRequest) => call<{ job: MemoryJob | null }>("POST", `/briefs/${enc(briefId)}/feedback`, req),
 
+  /** The crew talking to each other about the room (held after the morning brief). 404 until the first one. */
+  latestStandup: (roomId: string) => call<Standup>("GET", `/rooms/${enc(roomId)}/standup/latest`),
+  /** CEO only. 409 when fewer than two members have memories in the room. */
+  runStandup: (roomId: string) => call<Standup>("POST", `/rooms/${enc(roomId)}/standup`),
+
   /** `d:` decision · `f:` failure · `n:` next · `done:` · `l:` learned · `due:` deadline · `s:` story · `p:` preference. */
   capture: (roomId: string, text: string) => call<MemoryJob>("POST", `/rooms/${enc(roomId)}/capture`, { text }),
   debrief: (roomId: string, text: string) => call<Candidate[]>("POST", `/rooms/${enc(roomId)}/debrief`, { text }),
@@ -82,11 +88,11 @@ export const api = {
 
 /**
  * Live cues for the 3D office: `memory.stored` (an object appears), `recall.used` (cited objects glow),
- * `brief.created`, `crew.changed`. EventSource reconnects on its own and resumes from the last event id.
+ * `brief.created`, `standup.created`, `crew.changed`. EventSource reconnects on its own and resumes from the last event id.
  */
 export function onEvents(handler: (e: AquahabEvent) => void): () => void {
   const es = new EventSource("/api/events");
-  const types: AquahabEvent["type"][] = ["memory.queued", "memory.stored", "memory.failed", "recall.used", "brief.created", "crew.changed"];
+  const types: AquahabEvent["type"][] = ["memory.queued", "memory.stored", "memory.failed", "recall.used", "brief.created", "standup.created", "crew.changed"];
   const listener = (m: MessageEvent<string>) => {
     try {
       handler(JSON.parse(m.data) as AquahabEvent);

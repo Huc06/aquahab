@@ -4,7 +4,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { ChatResponse, DraftResponse, MemoriesResponse, Room } from "../src/contract.ts";
+import type { ChatResponse, DraftResponse, MemoriesResponse, Room, Standup } from "../src/contract.ts";
 
 const seen: { system: string; user: string; format: any; model: string }[] = [];
 let server: Server;
@@ -48,6 +48,20 @@ beforeAll(async () => {
           ],
           proposal: { type: "decision", text: "  Keep Tatum   GraphQL for events  " },
         };
+      } else if (system.includes("short standup")) {
+        const code = (word: string) => text.match(new RegExp(`^(m\\d+) .*${word}`, "m"))?.[1] ?? "m0";
+        out = text.includes("Project: Thin room")
+          ? { turns: [{ agent: "builder", to: null, text: "Cites a decision, not my domain.", cites: [code("Tatum")] }] }
+          : {
+              turns: [
+                { agent: "one", to: null, text: "We keep reading Sui through Tatum.", cites: [code("Tatum")] },
+                { agent: "builder", to: "one", text: "Listicles flopped, so not that format.", cites: [code("Listicles")] },
+                { agent: "hippo", to: null, text: "Not in this standup.", cites: [code("Tatum")] },
+                { agent: "builder", to: "builder", text: "  Talking   to myself. ", cites: [code("Listicles"), "m99"] },
+                { agent: "builder", to: null, text: "Out of my domain.", cites: [code("Tatum")] },
+                { agent: "one", to: "lofi", text: "Made up.", cites: ["m42"] },
+              ],
+            };
       } else if (system.includes("morning brief")) out = { sections: [{ agent: "one", lines: [{ text: "Ship the deploy.", cites: ["m1"] }] }] };
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(reply(out)));
@@ -81,16 +95,21 @@ const load = async () => {
 describe("LLM path (OpenAI-compatible provider)", () => {
   let room: Room;
   let blobs: string[];
+  let blobOf: (word: string) => string;
   let call: Awaited<ReturnType<typeof load>>["call"];
+  let processQueue: Awaited<ReturnType<typeof load>>["processQueue"];
 
   beforeAll(async () => {
     const l = await load();
     call = l.call;
+    processQueue = l.processQueue;
     room = (await call<Room>("POST", "/api/rooms", { slug: "llm", name: "LLM room", goal: "Ship it", contextTags: { lofi: "Brand Voice" } })).json;
     await call("POST", `/api/rooms/${room.id}/capture`, { text: "d: Read Sui through Tatum gRPC and GraphQL" });
     await call("POST", `/api/rooms/${room.id}/capture`, { text: "f: Listicles flopped" });
     for (let i = 0; i < 5; i++) await l.processQueue({ sleep: async () => {} });
-    blobs = (await call<MemoriesResponse>("GET", `/api/rooms/${room.id}/memories`)).json.memories.map((m) => m.blobId);
+    const wall = (await call<MemoriesResponse>("GET", `/api/rooms/${room.id}/memories`)).json.memories;
+    blobs = wall.map((m) => m.blobId);
+    blobOf = (word) => wall.find((m) => m.text?.includes(word))!.blobId;
     expect(blobs).toHaveLength(2);
   });
 
@@ -140,6 +159,37 @@ describe("LLM path (OpenAI-compatible provider)", () => {
     const r = await call<ChatResponse>("POST", `/api/rooms/${room.id}/chat`, { message: "What did we decide?", agent: "one" });
     expect(r.json.model).toBe("openai-compatible:fake-fast");
     expect(seen.at(-1)!.model).toBe("fake-fast");
+  });
+
+  it("lets the crew talk to each other, keeping only cited turns in each member's domain", async () => {
+    const r = await call<Standup>("POST", `/api/rooms/${room.id}/standup`);
+    expect(r.status).toBe(201);
+    expect(r.json.source).toBe("llm");
+    expect(r.json.model).toBe("openai-compatible:fake-main");
+    const [d, f] = [blobOf("Tatum"), blobOf("Listicles")];
+    expect(r.json.turns).toEqual([
+      { agent: "one", to: null, text: "We keep reading Sui through Tatum.", cites: [d] },
+      { agent: "builder", to: "one", text: "Listicles flopped, so not that format.", cites: [f] },
+      { agent: "builder", to: null, text: "Talking to myself.", cites: [f] },
+    ]);
+    const req = seen.filter((s) => s.system.includes("short standup")).at(-1)!;
+    expect(req.user).toMatch(/^Who is here: one, builder$/m);
+    expect(req.user).toContain("Room goal: Ship it");
+  });
+
+  it("reads the memories out when none of the model's turns survive", async () => {
+    const thin = (await call<Room>("POST", "/api/rooms", { slug: "thin", name: "Thin room" })).json;
+    await call("POST", `/api/rooms/${thin.id}/capture`, { text: "d: Read Sui through Tatum gRPC" });
+    await call("POST", `/api/rooms/${thin.id}/capture`, { text: "f: Listicles flopped again" });
+    for (let i = 0; i < 5; i++) await processQueue({ sleep: async () => {} });
+    const r = await call<Standup>("POST", `/api/rooms/${thin.id}/standup`);
+    expect(r.status).toBe(201);
+    expect(r.json.source).toBe("fallback");
+    expect(r.json.model).toBeNull();
+    expect(r.json.turns.map((t) => [t.agent, t.text])).toEqual([
+      ["one", "Read Sui through Tatum gRPC"],
+      ["builder", "Listicles flopped again"],
+    ]);
   });
 
   it("puts the goal and lens in the brief prompt", async () => {

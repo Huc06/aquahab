@@ -354,6 +354,7 @@ export type AquahabEvent =
   | { type: "memory.failed"; job: MemoryJob }
   | { type: "recall.used"; roomId: string; blobIds: string[]; purpose: string }
   | { type: "brief.created"; roomId: string; briefId: string }
+  | { type: "standup.created"; roomId: string; standupId: string }
   | { type: "crew.changed"; roles: Role[] };
 
 export interface ApiError {
@@ -446,6 +447,36 @@ export interface ChatResponse {
   replies: ChatReply[];
   proposal: ChatProposal | null;
   recalled: number;
+  source: "llm" | "fallback";
+  model: string | null;
+}
+
+// ---------- the crew standup ----------
+
+/** One turn of the standup: a member speaks to the crew (`to: null`) or answers another member. */
+export interface StandupTurn {
+  agent: Role;
+  /** The member this turn answers, or null when it speaks to the whole crew. */
+  to: Role | null;
+  text: string;
+  /** Blob ids the turn is based on. A turn that cites nothing real is dropped. */
+  cites: string[];
+}
+
+/**
+ * The crew talking to each other about one room, from its memories: after the morning brief, or on demand.
+ * Kept in the ledger, never on Walrus: it is a conversation about memories, not a new memory.
+ * The office plays the turns in order (`standup.created` announces a new one).
+ */
+export interface Standup {
+  id: string;
+  roomId: string;
+  createdAt: string;
+  dayIndex: number;
+  turns: StandupTurn[];
+  /** How many memories were recalled from Walrus to hold it. */
+  recalled: number;
+  /** "llm": written by the model; "fallback": each member reads out its newest memory. */
   source: "llm" | "fallback";
   model: string | null;
 }

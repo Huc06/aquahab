@@ -95,6 +95,7 @@ Shapes: [`src/contract.ts`](src/contract.ts). Reads are public; writes (✱) nee
 | `GET /api/session` | `{ ceo }` |
 | `GET /api/rooms` · `POST /api/rooms` ✱ · `GET/PATCH ✱ /api/rooms/:id` | rooms (one namespace each), with an optional goal and `contextTags` (a label per crew member; `CONTEXT_PRESETS.creator`) |
 | `GET /api/rooms/:id/brief/latest` · `GET …/briefs` · `POST …/brief` ✱ | briefs with per-line `cites` (blob ids) |
+| `GET /api/rooms/:id/standup/latest` · `POST …/standup` ✱ | the crew talking to each other about the room after the morning brief: turns with `to` (who they answer) and `cites` (blob ids). Stores nothing on Walrus; 409 when fewer than two members have memories |
 | `POST /api/briefs/:id/feedback` ✱ | `{ rating: "up"\|"down", reason? }` → feedback memory |
 | `POST /api/rooms/:id/capture` ✱ | `{ text }` with a quick-capture prefix, or free text (classified) → `MemoryJob` |
 | `POST /api/rooms/:id/debrief` ✱ · `GET …/candidates` · `POST /api/candidates/decide` ✱ | proposals, then keep/drop/edit → `MemoryJob[]` |
@@ -106,7 +107,7 @@ Shapes: [`src/contract.ts`](src/contract.ts). Reads are public; writes (✱) nee
 | `GET /api/memories/:blobId/receipt` | one memory's on-chain receipt via Tatum: Blob object, namespace, write tx, checkpoint |
 | `GET /api/crew` | the payroll from Sui via Tatum: labels, Agent IDs, hire dates and txs, memories per employee, vacancies |
 | `GET /api/proof` | relayer vs chain counts, per room and per employee |
-| `GET /api/events` | SSE: `memory.queued/stored/failed`, `recall.used { blobIds }`, `brief.created`, `crew.changed` |
+| `GET /api/events` | SSE: `memory.queued/stored/failed`, `recall.used { blobIds }`, `brief.created`, `standup.created`, `crew.changed` |
 | `POST /api/cron/tick` | scheduler tick for serverless hosts (bearer `CRON_SECRET`) |
 | `POST /telegram/webhook` | Telegram webhook (secret header), registered on boot when `TELEGRAM_MODE=webhook`; the web app proxies it |
 | `GET /healthz` | liveness for the host, no outbound calls |

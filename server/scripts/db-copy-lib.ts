@@ -17,6 +17,7 @@ export const TABLES: CopyTable[] = [
   { name: "settings", jsonb: ["value"], where: "key <> 'telegram.offset'" },
   { name: "memory_jobs", jsonb: ["notify"] },
   { name: "briefs", jsonb: ["sections", "recall"] },
+  { name: "standups", jsonb: ["turns"] },
   { name: "debriefs" },
   { name: "candidates" },
   { name: "schedule_runs" },

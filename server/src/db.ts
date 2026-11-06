@@ -96,6 +96,16 @@ const SCHEMA = [
      telegram_message_id bigint,
      created_at timestamptz not null default now())`,
   `create index if not exists briefs_room on briefs (room_id, created_at desc)`,
+  `create table if not exists standups (
+     id text primary key,
+     room_id text not null,
+     day_index int not null,
+     turns jsonb not null,
+     recalled int not null,
+     source text not null,
+     model text,
+     created_at timestamptz not null default now())`,
+  `create index if not exists standups_room on standups (room_id, created_at desc)`,
   `create table if not exists debriefs (
      id text primary key,
      room_id text not null,
