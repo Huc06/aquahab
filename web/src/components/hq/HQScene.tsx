@@ -29,6 +29,7 @@ import { useBanter } from "@/lib/banter";
 import { cellOf, findPath, navFor, objectAt, objectsOf, pickTarget, worldOf, type NavGrid, type ObjectCluster } from "@/lib/hq-nav";
 import { useHQ } from "@/lib/store";
 import type { Agent, AgentStatus } from "@/lib/types";
+import { useActiveRoom } from "@/lib/useApi";
 import { retint } from "@/lib/materials";
 
 const OFFICE_URL = "/models/office.glb";
@@ -237,7 +238,10 @@ function Crew() {
   }, [prepared]);
 
   const agentById = useMemo(() => Object.fromEntries(AGENTS.map((a) => [a.id, a])), []);
-  const banter = useBanter();
+  const { room } = useActiveRoom();
+  const banter = useBanter(room?.id ?? null);
+  // A standup turn that answers another member names them first.
+  const line = banter.to ? `@${agentById[banter.to]?.name ?? banter.to} ${banter.text}` : banter.text;
 
   return (
     <>
@@ -252,7 +256,7 @@ function Crew() {
           scale={scale}
           baseY={baseY}
           selected={selectedAgent === spot.id}
-          chat={banter.speaker === spot.id ? banter.text : null}
+          chat={banter.speaker === spot.id ? line : null}
           order={order}
           onSelect={() => selectAgent(spot.id)}
         />

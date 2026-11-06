@@ -497,6 +497,94 @@ export async function crewChat(input: ChatInput): Promise<ChatOutput> {
   return { ...fallbackChat(input), source: "fallback", model: null };
 }
 
+// ---------- the crew standup: members talk to each other ----------
+
+const StandupSchema = z.object({
+  turns: z
+    .array(z.object({ agent: z.enum(BRIEF_AGENTS), to: z.enum(BRIEF_AGENTS).nullable(), text: z.string(), cites: z.array(z.string()) }))
+    .max(8),
+});
+
+export interface StandupInput {
+  roomName: string;
+  today: string; // YYYY-MM-DD local
+  dayIndex: number;
+  goal?: string | null;
+  lens?: ContextTags | null;
+  memories: CodedMemory[]; // the room, newest first
+  /** Who is in the standup: one, plus every member with memories of its own types. */
+  speakers: Speaker[];
+}
+
+export interface StandupDraft {
+  turns: { agent: Speaker; to: Speaker | null; text: string; cites: string[] }[]; // cites are codes
+  source: "llm" | "fallback";
+  model: string | null;
+}
+
+const STANDUP_SYSTEM = `You are the crew of Aquahab, a project office that remembers. Before the CEO arrives, the crew holds a
+short standup about one project. The members talk to each other, not to the CEO.
+
+Each member speaks only for its own domain:
+- one (Chief of Staff): decisions and next steps. one runs the standup: it opens with the most important next step.
+- builder: what shipped and what failed. researcher: what was learned.
+- hippo: deadlines and commitments, with days left counted from today. lofi: story, voice and audience notes.
+
+Rules:
+- 3 to 8 turns, in the order they are said. Only the members listed under "Who is here" speak.
+- A turn speaks to the whole crew (to: null) or answers one member (to: that member). An answer reacts to what that
+  member just said: a handoff, a dependency, a risk, a question about their domain, or an update that closes a next step.
+  The office shows who a turn answers, so do not open the text with that member's name.
+- At most 25 words per turn. Every turn cites the codes of the memories it rests on. A turn with nothing to cite is left out.
+- Outside one, a member states only facts from memories of its own types.
+- When a memory says [supersedes:X], the newer one wins. A next step that a later done memory completed is done, not open.
+- Never link two memories by cause unless a memory states that link.
+- Never invent facts, names, dates, numbers or opinions that are not in the memories. No small talk, no greetings.
+${LENS_RULE}
+${STYLE}`;
+
+export async function crewStandup(input: StandupInput): Promise<StandupDraft> {
+  if (env.llmEnabled() && input.memories.length) {
+    try {
+      const { output } = await gen({
+        model: lm("main"),
+        system: STANDUP_SYSTEM,
+        prompt: [
+          `Project: ${input.roomName}`,
+          `Today: ${input.today} (day ${input.dayIndex} of the crew remembering this project)`,
+          ...roomContext(input.goal, input.lens),
+          `Who is here: ${input.speakers.join(", ")}`,
+          "",
+          "Project memories (most recent first):",
+          ...input.memories.map((m) => `${m.code} ${m.text}`),
+        ].join("\n"),
+        output: Output.object({ schema: StandupSchema }),
+        temperature: 0.4,
+        abortSignal: patience(60_000),
+      });
+      return { turns: output.turns, source: "llm", model: `${env.llmProvider()}:${env.llmModel()}` };
+    } catch (e) {
+      console.warn(`[llm] standup fell back: ${why(e)}`);
+    }
+  }
+  return { ...fallbackStandup(input), source: "fallback", model: null };
+}
+
+/**
+ * Without a model: one reads out the newest open next step or decision, then each member its newest memory.
+ * Nothing is reworded, so nothing is invented. Superseded memories are skipped.
+ */
+export function fallbackStandup(input: StandupInput): Pick<StandupDraft, "turns"> {
+  const superseded = new Set(input.memories.map((m) => parseMemory(m.text).supersedes).filter(Boolean) as string[]);
+  const live = input.memories.filter((m) => !superseded.has(m.blobId));
+  const turns: StandupDraft["turns"] = [];
+  for (const agent of input.speakers) {
+    const mine = live.find((m) => DOMAIN[agent].includes(parseMemory(m.text).type as MemoryType));
+    if (mine) turns.push({ agent, to: null, text: parseMemory(mine.text).body, cites: [mine.code] });
+  }
+  return { turns };
+}
+
 /** Without a model: each speaker quotes its most relevant memories (recall order), nothing more. */
 export function fallbackChat(input: ChatInput): Pick<ChatOutput, "replies" | "proposal"> {
   const replies = input.speakers

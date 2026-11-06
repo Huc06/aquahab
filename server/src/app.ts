@@ -14,6 +14,7 @@ import { EmptyMemoryError, getJob, retryJob, toJob } from "./memory/keeper.ts";
 import { recall } from "./memory/walrus.ts";
 import { createRoom, getRoom, listRooms, RoomError, updateRoom } from "./rooms.ts";
 import { tick } from "./scheduler.ts";
+import { latestStandup, runStandup } from "./standup.ts";
 import { chat, draft } from "./studio.ts";
 import { acceptUpdate, handleUpdate } from "./telegram.ts";
 import { crewView, healthView, memoriesView, proofView, receiptView } from "./views.ts";
@@ -85,6 +86,16 @@ app.post("/api/briefs/:id/feedback", ceo, async (c) => {
   const req = await body<BriefFeedbackRequest>(c);
   if (req.rating !== "up" && req.rating !== "down") throw new ActionError("rating is 'up' or 'down'.");
   return c.json({ job: await rateBrief(c.req.param("id")!, req.rating, req.reason) });
+});
+
+// ---------- the crew standup (the members talk to each other; stores nothing on Walrus) ----------
+app.get("/api/rooms/:id/standup/latest", async (c) => {
+  const s = await latestStandup((await roomOr404(c)).id);
+  return s ? c.json(s) : fail(c, 404, "No standup yet.");
+});
+app.post("/api/rooms/:id/standup", ceo, async (c) => {
+  const s = await runStandup(await roomOr404(c));
+  return s ? c.json(s, 201) : fail(c, 409, "Not enough memory for a standup yet: it needs memories from at least two crew members.");
 });
 
 // ---------- capture and debrief ----------

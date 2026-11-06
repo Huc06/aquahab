@@ -1,11 +1,13 @@
 // The clock that makes the crew message first. One `tick()`:
 //   1. moves the Keeper's write queue (submit paced writes, settle pending ones)
-//   2. sends each room's morning brief and evening debrief once per local day, at the CEO's times
+//   2. sends each room's morning brief and evening debrief once per local day, at the CEO's times;
+//      after the brief, the crew holds its standup in the office (standup.ts)
 // A long-lived host calls tick() on an interval; a serverless host calls POST /api/cron/tick.
 import { env } from "./env.ts";
 import { q } from "./db.ts";
 import { processQueue } from "./memory/keeper.ts";
 import { runBrief } from "./brief.ts";
+import { runStandup } from "./standup.ts";
 import { askDebrief, deliverBrief } from "./telegram.ts";
 import { listRooms } from "./rooms.ts";
 import { localParts, minutesOf } from "./util.ts";
@@ -66,6 +68,8 @@ async function runDaily(room: Room, kind: "brief" | "debrief", local: ReturnType
       const b = await runBrief(room, "morning");
       await deliverBrief(room, b);
       out.briefs.push(room.slug);
+      // Then the crew talks it over in the office. A failed standup never fails the brief.
+      await runStandup(room).catch((e) => out.errors.push(`standup ${room.slug}: ${(e as Error).message}`));
     } else {
       await askDebrief(room);
       out.debriefs.push(room.slug);
