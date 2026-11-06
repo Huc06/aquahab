@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { AGENTS, COMPANY_BUDGET } from "@/lib/mock";
+import { CREW } from "@/lib/api-types";
+import { useCrew } from "@/lib/useCrew";
 import { useHQ, type DrawerKind } from "@/lib/store";
 import { RoomsPanel } from "@/components/rooms/RoomsPanel";
 import { VaultPanel } from "@/components/memory/VaultPanel";
@@ -20,29 +21,22 @@ const TITLE: Record<Exclude<DrawerKind, null>, string> = {
 
 function AgentDetail() {
   const id = useHQ((s) => s.selectedAgent);
-  const agent = AGENTS.find((a) => a.id === id);
-  if (!agent) return <p className="text-sm text-fg-3">Select an agent on the stage or in the top bar.</p>;
-  const pct = Math.round((agent.spentCents / agent.budgetCents) * 100);
+  const { byRole, loading } = useCrew();
+  if (!id) return <p className="text-sm text-fg-3">Select an agent on the stage or in the top bar.</p>;
+  const member = byRole.get(id);
+  if (loading && !member) return <p className="text-sm text-fg-3">Loading crew…</p>;
+  if (!member) return <p className="text-sm text-fg-3">{CREW[id].name} has no key on the crew right now.</p>;
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-base font-semibold text-agent">{agent.name}</p>
-        <p className="text-sm text-fg-2">{agent.role}</p>
+        <p className="text-base font-semibold text-agent">{member.name}</p>
+        <p className="text-sm text-fg-2">{member.title ?? CREW[id].title}</p>
       </div>
-      <p className="text-sm text-fg-2">{agent.currentTask ? `Current task: ${agent.currentTask}` : "No current task."}</p>
-      <div>
-        <div className="flex justify-between font-mono text-[13px] text-fg-2">
-          <span className="font-sans">LLM</span>
-          <span>
-            {agent.spentCents}¢ of {agent.budgetCents}¢
-          </span>
-        </div>
-        <div className="mt-1 h-1 overflow-hidden rounded-sm bg-deep" role="meter" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${agent.name} LLM budget used`}>
-          <div className="h-full bg-mem" style={{ width: `${pct}%` }} />
-        </div>
-      </div>
+      <p className="font-mono text-[13px] text-fg-2">
+        {member.memoryCount} memories filed
+        {member.hiredAt ? ` · hired ${member.hiredAt.slice(0, 10)}` : ""}
+      </p>
       <p className="text-sm text-fg-3">Agents own no memories. Access is enforced by Aquahab.</p>
-      <p className="font-mono text-[13px] text-fg-3">Company budget: {COMPANY_BUDGET.spentCents}¢ of {COMPANY_BUDGET.budgetCents}¢</p>
     </div>
   );
 }

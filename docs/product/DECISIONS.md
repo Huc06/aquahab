@@ -173,3 +173,16 @@ Spec: `docs/features/telegram-bot.md`. This section changes how the bot asks for
 **Why:** the CEO should not need to know the `|` syntax or the prefixes to get started. Buttons lead, and typed syntax stays for speed.
 
 **How to apply:** new Telegram prompts go through the `Pending` state with a button for every optional field. Do not add a new typed-only option without a matching button.
+
+## 13. The office comes alive, v3.2 (2026-11-06)
+
+Spec: `docs/features/hq-scene.md`, section "Current build". This section overrides §9 where they conflict.
+
+1. **Walking agents are in the MVP.** §9 listed walking agents as Phase 2. The CEO asked for the crew to move around each desk, so they roam within a radius of their desk and keep clear of the office objects.
+2. **Status and task are not shown.** The server does not report agent status or current task. The labels show the title and the memory count. The old mock task text is removed.
+3. **`mock.ts` is removed from the web app.** The scene, the agent tabs and the drawer read `/api/crew` only.
+4. **Object captions come from the geometry.** Names are added once each object is identified.
+
+**Why:** the labels must not show data the server did not return. The crew should look alive without pretending to know more than the server does.
+
+**How to apply:** new scene labels read from the API. Do not add a status or a task to a label unless the server reports it.

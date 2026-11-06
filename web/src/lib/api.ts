@@ -10,7 +10,11 @@ import type {
   BriefFeedbackRequest,
   Candidate,
   CandidateDecision,
+  ChatRequest,
+  ChatResponse,
   CreateRoomRequest,
+  DraftRequest,
+  DraftResponse,
   CrewResponse,
   HealthResponse,
   MemoriesResponse,
@@ -70,6 +74,10 @@ export const api = {
 
   /** `d:` decision · `f:` failure · `n:` next · `done:` · `l:` learned · `due:` deadline · `s:` story · `p:` preference. */
   capture: (roomId: string, text: string) => call<MemoryJob>("POST", `/rooms/${enc(roomId)}/capture`, { text }),
+  /** Drafts a line in the room's voice. Stores nothing; commit the result through `capture`. CEO session. */
+  draft: (roomId: string, body: DraftRequest) => call<DraftResponse>("POST", `/rooms/${enc(roomId)}/draft`, body),
+  /** Asks the crew. Ephemeral: nothing is stored. CEO session. */
+  chat: (roomId: string, body: ChatRequest) => call<ChatResponse>("POST", `/rooms/${enc(roomId)}/chat`, body),
   debrief: (roomId: string, text: string) => call<Candidate[]>("POST", `/rooms/${enc(roomId)}/debrief`, { text }),
   candidates: (roomId: string) => call<Candidate[]>("GET", `/rooms/${enc(roomId)}/candidates`),
   decide: (decisions: CandidateDecision[]) => call<MemoryJob[]>("POST", "/candidates/decide", { decisions }),
