@@ -7,7 +7,7 @@ import type { MemoryType, Room, Standup, StandupTurn } from "./contract.ts";
 import { env } from "./env.ts";
 import { one, q } from "./db.ts";
 import { emit } from "./events.ts";
-import { crewStandup, DOMAIN, fallbackStandup, SPEAKERS, type CodedMemory, type Speaker, type StandupDraft } from "./llm.ts";
+import { crewStandup, DOMAIN, fallbackStandup, SPEAKERS, withoutCodes, type CodedMemory, type Speaker, type StandupDraft } from "./llm.ts";
 import { parseMemory } from "./memory/format.ts";
 import { recall } from "./memory/walrus.ts";
 import { localParts, newId } from "./util.ts";
@@ -24,7 +24,9 @@ export function standupSpeakers(memories: CodedMemory[]): Speaker[] {
 
 /**
  * Receipts or it didn't happen. Keeps a turn only when its speaker is in the standup and it cites recalled
- * memories (codes become blob ids); outside one, at least one cite must be of the speaker's own types.
+ * memories (codes become blob ids), at least one of the speaker's own types. one may also cite a done memory, to
+ * say a next step is closed, but not only a failure: a turn that rests on a failure alone is one turning history
+ * into a task ("run the missed brief"), which is builder's to report.
  * An answer to someone who is not in the standup, or to oneself, becomes a turn to the whole crew.
  */
 export function checkTurns(turns: StandupDraft["turns"], memories: CodedMemory[], speakers: Speaker[]): StandupTurn[] {
@@ -32,11 +34,12 @@ export function checkTurns(turns: StandupDraft["turns"], memories: CodedMemory[]
   const here = new Set<Speaker>(speakers);
   const out: StandupTurn[] = [];
   for (const t of turns) {
-    const text = t.text.replace(/\s+/g, " ").trim().slice(0, MAX_TEXT);
+    const text = withoutCodes(t.text).slice(0, MAX_TEXT);
     if (!here.has(t.agent) || !text) continue;
     const cited = [...new Set(t.cites)].map((c) => byCode.get(c)).filter((m): m is CodedMemory => !!m);
     if (!cited.length) continue;
-    if (t.agent !== "one" && !cited.some((m) => DOMAIN[t.agent].includes(parseMemory(m.text).type as MemoryType))) continue;
+    const own: MemoryType[] = t.agent === "one" ? [...DOMAIN.one, "done"] : DOMAIN[t.agent];
+    if (!cited.some((m) => own.includes(parseMemory(m.text).type as MemoryType))) continue;
     const to = t.to && t.to !== t.agent && here.has(t.to) ? t.to : null;
     out.push({ agent: t.agent, to, text, cites: [...new Set(cited.map((m) => m.blobId))] });
     if (out.length === MAX_TURNS) break;

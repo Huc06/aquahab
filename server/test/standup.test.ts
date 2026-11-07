@@ -6,6 +6,7 @@ import type { MemoriesResponse, Room, Standup } from "../src/contract.ts";
 import { closeDb, q } from "../src/db.ts";
 import { processQueue } from "../src/memory/keeper.ts";
 import { tick } from "../src/scheduler.ts";
+import { withoutCodes } from "../src/llm.ts";
 import { checkTurns, standupSpeakers } from "../src/standup.ts";
 import { localParts } from "../src/util.ts";
 
@@ -104,6 +105,7 @@ describe("checking the turns", () => {
     { code: "m1", blobId: "blob-next", text: "[next][r][2026-11-06][by:one] Record the demo" },
     { code: "m2", blobId: "blob-done", text: "[done][r][2026-11-06][by:builder] Deploy is live" },
     { code: "m3", blobId: "blob-story", text: "[story][r][2026-11-06][by:lofi] Open on the office" },
+    { code: "m4", blobId: "blob-failure", text: "[failure][r][2026-11-05][by:builder] The 5 Nov brief never ran" },
   ];
 
   it("takes one, plus each member whose types are in the recall", () => {
@@ -116,12 +118,14 @@ describe("checking the turns", () => {
     const turns = checkTurns(
       [
         { agent: "one", to: null, text: "Demo first.", cites: ["m1"] },
-        { agent: "builder", to: "one", text: "  Deploy   is live.  ", cites: ["m2", "m2", "m9"] },
+        { agent: "builder", to: "one", text: "  Deploy   is live (see m2).  ", cites: ["m2", "m2", "m9"] },
         { agent: "hippo", to: null, text: "Not here.", cites: ["m1"] },
         { agent: "lofi", to: "lofi", text: "Open on the office.", cites: ["m3"] },
         { agent: "lofi", to: "hippo", text: "Out of my lane.", cites: ["m2"] },
         { agent: "builder", to: "researcher", text: "Made up.", cites: ["m42"] },
         { agent: "one", to: null, text: "   ", cites: ["m1"] },
+        { agent: "one", to: null, text: "Run the missed 5 Nov brief.", cites: ["m4"] },
+        { agent: "one", to: "builder", text: "The deploy step is closed.", cites: ["m2"] },
       ],
       memories,
       ["one", "builder", "lofi"],
@@ -130,7 +134,15 @@ describe("checking the turns", () => {
       { agent: "one", to: null, text: "Demo first.", cites: ["blob-next"] },
       { agent: "builder", to: "one", text: "Deploy is live.", cites: ["blob-done"] },
       { agent: "lofi", to: null, text: "Open on the office.", cites: ["blob-story"] }, // answering oneself is not an answer
+      // one may say a next step is closed, but may not turn a failure alone into a task
+      { agent: "one", to: "builder", text: "The deploy step is closed.", cites: ["blob-done"] },
     ]);
+  });
+
+  it("drops memory codes the model wrote into the text", () => {
+    expect(withoutCodes("No open next steps; the cut-over is done (m1). What next?")).toBe("No open next steps; the cut-over is done. What next?");
+    expect(withoutCodes("Shipped (see m2, m3) and fixed (m4 and c1)")).toBe("Shipped and fixed");
+    expect(withoutCodes("Merged #15 (draft and chat)")).toBe("Merged #15 (draft and chat)");
   });
 
   it("caps a standup at eight turns", () => {
