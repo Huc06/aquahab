@@ -2,7 +2,8 @@
 // room lens and goal, draft with receipts, ask the crew with receipts, and nothing stored by either.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../src/app.ts";
-import { CONTEXT_PRESETS, type ChatResponse, type DraftResponse, type MemoriesResponse, type Room } from "../src/contract.ts";
+import { CONTEXT_PRESETS, walruscanBlob, type ChatResponse, type CompareResponse, type DraftResponse, type MemoriesResponse, type Room } from "../src/contract.ts";
+import { compareHtml } from "../src/telegram.ts";
 import { closeDb, q } from "../src/db.ts";
 import { inDomain, roomContext } from "../src/llm.ts";
 import { processQueue } from "../src/memory/keeper.ts";
@@ -131,6 +132,61 @@ describe("ask the crew", () => {
     expect((await call("POST", `/api/rooms/${room.id}/chat`, { message: "", agent: "all" })).status).toBe(400);
     expect((await call("POST", `/api/rooms/${room.id}/chat`, { message: "hi", agent: "keeper" })).status).toBe(400);
     expect((await call("POST", `/api/rooms/${room.id}/chat`, { message: "hi", agent: "ghost" })).status).toBe(400);
+  });
+});
+
+describe("the memory switch", () => {
+  it("answers one question without memory, then from the room's memory with receipts, and stores nothing", async () => {
+    const before = await jobCount();
+    const r = await call<CompareResponse>("POST", `/api/rooms/${room.id}/compare`, { question: "  What format failed?  " });
+    expect(r.status).toBe(200);
+    expect(r.json.question).toBe("What format failed?");
+    expect(r.json.withoutMemory).toEqual({
+      text: "With no memory, the crew knows nothing about Creator Studio: not what you decided, what broke or what is next.",
+      cites: [],
+      source: "fallback",
+    });
+    expect(r.json.withMemory.recalled).toBeGreaterThan(0);
+    expect(r.json.withMemory.cites.length).toBe(1);
+    expect(blobs.has(r.json.withMemory.cites[0])).toBe(true);
+    expect(await jobCount()).toBe(before);
+    const events = await q(`select purpose, namespace from recall_events where purpose = 'compare'`);
+    expect(events.map((e) => e.namespace)).toEqual([room.namespace]); // one recall, the room only; none for the blank side
+  });
+
+  it("says so when the room has no memory, and rejects bad input", async () => {
+    const empty = (await call<Room[]>("GET", "/api/rooms")).json.find((x) => x.slug === "empty-room")!;
+    const none = await call<CompareResponse>("POST", `/api/rooms/${empty.id}/compare`, { question: "Anything?" });
+    expect(none.json.withMemory).toEqual({ text: "Nothing in this room's memory answers that yet.", cites: [], source: "fallback", recalled: 0 });
+    expect((await call("POST", `/api/rooms/${room.id}/compare`, { question: " " })).status).toBe(400);
+    expect((await call("POST", `/api/rooms/${room.id}/compare`, { question: "x".repeat(1001) })).status).toBe(400);
+    expect((await call("POST", `/api/rooms/${room.id}/compare`, {})).status).toBe(400);
+  });
+
+  it("is for the CEO only", async () => {
+    process.env.AUTH = "on";
+    const r = await call("POST", `/api/rooms/${room.id}/compare`, { question: "What failed?" });
+    process.env.AUTH = "off";
+    expect(r.status).toBe(401);
+  });
+
+  it("renders both answers in Telegram, with the receipts under the memory side only", () => {
+    const html = compareHtml("A <b> room", {
+      roomId: "r",
+      question: "What <failed>?",
+      withoutMemory: { text: "No idea.", cites: [], source: "llm" },
+      withMemory: { text: "Listicles.", cites: ["blobAAAAAAAAAAAA"], source: "llm", recalled: 3 },
+    });
+    expect(html.split("\n")).toEqual([
+      "<b>A &lt;b&gt; room</b> · What &lt;failed&gt;?",
+      "",
+      "<b>Without memory</b>",
+      "No idea.",
+      "",
+      "<b>With memory</b> · 3 recalled from Walrus",
+      "Listicles.",
+      '<i>[1] <a href="' + walruscanBlob("blobAAAAAAAAAAAA") + '">blobAA…</a></i>',
+    ]);
   });
 });
 

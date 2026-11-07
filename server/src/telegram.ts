@@ -4,7 +4,7 @@
 //   evening   the debrief question; the reply becomes proposals the CEO keeps or drops
 // One CEO per deployment: the first chat that sends `/start <pair code>` is bound, everyone else is refused.
 import { timingSafeEqual } from "node:crypto";
-import { CREW, walruscanBlob, type Brief, type Candidate, type MemoryJob, type Room } from "./contract.ts";
+import { CREW, walruscanBlob, type Brief, type Candidate, type CompareResponse, type MemoryJob, type Room } from "./contract.ts";
 import { env } from "./env.ts";
 import { getSetting, q, setSetting } from "./db.ts";
 import { subscribe } from "./events.ts";
@@ -16,6 +16,7 @@ import { EmptyMemoryError } from "./memory/keeper.ts";
 import { parseCapture, parseMemory } from "./memory/format.ts";
 import { createRoom, getRoom, listRooms, RoomError, updateRoom } from "./rooms.ts";
 import { magicLink } from "./auth.ts";
+import { compare } from "./studio.ts";
 import { crewView } from "./views.ts";
 import { escapeHtml as esc, isHHMM } from "./util.ts";
 
@@ -70,6 +71,20 @@ async function activeRoom(): Promise<Room | null> {
 // ---------- rendering ----------
 
 const shortBlob = (b: string) => `${b.slice(0, 6)}…`;
+
+/** /compare: the answer with no memory, then the answer from Walrus with its receipts. */
+export function compareHtml(roomName: string, r: CompareResponse): string {
+  return [
+    `<b>${esc(roomName)}</b> · ${esc(r.question)}`,
+    "",
+    "<b>Without memory</b>",
+    esc(r.withoutMemory.text),
+    "",
+    `<b>With memory</b> · ${r.withMemory.recalled} recalled from Walrus`,
+    esc(r.withMemory.text),
+    ...r.withMemory.cites.map((b, i) => `<i>[${i + 1}] <a href="${walruscanBlob(b)}">${esc(shortBlob(b))}</a></i>`),
+  ].join("\n");
+}
 
 export function renderBrief(room: Room, b: Brief): { html: string; markup: Markup } {
   const notes: string[] = [];
@@ -239,7 +254,8 @@ export function helpHtml(): string {
     "<b>Commands</b>",
     "/rooms switch room · /new name [| goal] [| times] [private]",
     "/brief now · /debrief now · /skip tonight's debrief",
-    "/ask question · /memories · /crew · /times · /web",
+    "/ask question · /compare question (without and with memory)",
+    "/memories · /crew · /times · /web",
   ].join("\n");
 }
 
@@ -495,6 +511,16 @@ async function handleText(chatId: number, messageId: number, text: string, reply
         [`<b>${esc(room.name)}</b> · ${esc(arg)}`, "", esc(a.answer), ...cited.map((m, i) => `<i>[${i + 1}] <a href="${walruscanBlob(m.blobId)}">${esc(shortBlob(m.blobId))}</a></i>`)].join("\n"),
       ));
     }
+    case "/compare": {
+      if (!arg) return void (await send(chatId, "Ask one question twice: <code>/compare what did we decide about Tatum?</code>"));
+      const wait = await send(chatId, `<i>${esc(room.name)}: asking once with no memory, once from Walrus…</i>`);
+      try {
+        return void (await edit(chatId, wait, compareHtml(room.name, await compare(room, { question: arg }))));
+      } catch (e) {
+        if (e instanceof ActionError) return void (await edit(chatId, wait, esc(e.message)));
+        throw e;
+      }
+    }
     case "/memories": {
       const rows = await q(`select * from memory_jobs where room_id = $1 order by created_at desc limit 10`, [room.id]);
       if (!rows.length) return void (await send(chatId, `${esc(room.name)} has no memories yet.`));
@@ -694,6 +720,7 @@ const COMMANDS = [
   { command: "rooms", description: "Switch room" },
   { command: "new", description: "Open a room for a project" },
   { command: "ask", description: "Ask the room's memory" },
+  { command: "compare", description: "One question, without and with memory" },
   { command: "memories", description: "Latest memories in this room" },
   { command: "crew", description: "Who works here (from Sui)" },
   { command: "times", description: "Set brief and debrief times" },

@@ -15,7 +15,7 @@ export function llmStatus(): { ok: boolean; model: string | null } {
 
 let compatible: ReturnType<typeof createOpenAICompatible> | null = null;
 
-/** The model for a job: "main" writes briefs and debrief proposals, "fast" classifies and answers. */
+/** The model for a job: "main" writes briefs, debrief proposals and answers from memory; "fast" classifies and answers one-on-one. */
 function lm(kind: "main" | "fast"): LanguageModel {
   const id = kind === "main" ? env.llmModel() : env.llmFastModel();
   if (env.llmProvider() === "gateway") return id; // AI Gateway is the AI SDK's default provider for "provider/model" ids
@@ -324,25 +324,58 @@ export async function classifyCapture(text: string): Promise<MemoryType> {
 
 const AnswerSchema = z.object({ answer: z.string(), cites: z.array(z.string()) });
 
-export async function answerFromMemory(question: string, roomName: string, memories: CodedMemory[]): Promise<{ answer: string; cites: string[] }> {
-  if (!memories.length) return { answer: "Nothing in this room's memory answers that yet.", cites: [] };
+export async function answerFromMemory(
+  question: string,
+  roomName: string,
+  memories: CodedMemory[],
+): Promise<{ answer: string; cites: string[]; source: "llm" | "fallback" }> {
+  if (!memories.length) return { answer: "Nothing in this room's memory answers that yet.", cites: [], source: "fallback" };
   if (env.llmEnabled()) {
     try {
       const { output } = await gen({
-        model: lm("fast"),
-        system: `Answer the CEO's question about the project "${roomName}" in at most 3 short sentences, using only the memories given. Cite the codes you used. If the memories do not answer it, say "Not in memory yet." ${STYLE}`,
+        // The main model: on the live aquahab room the fast one called a closed step "next" 2 runs in 3, the main one 0 in 3.
+        model: lm("main"),
+        system: `Answer the CEO's question about the project "${roomName}" in at most 3 short sentences, using only the memories given. Cite the codes you used. If the memories do not answer it, say "Not in memory yet."
+Each memory starts with its type. A decision is already made: report it as a decision, never as a plan or a next step.
+A next step is closed when a done memory describes the same work, even in other words or only in part. Never present a closed step as next; if no next step is open, say so. ${STYLE}`,
         prompt: [...memories.map((m) => `${m.code} ${m.text}`), "", `Question: ${question}`].join("\n"),
         output: Output.object({ schema: AnswerSchema }),
         temperature: 0.2,
-        abortSignal: patience(30_000),
+        abortSignal: patience(45_000),
       });
-      return output;
+      return { ...output, source: "llm" };
     } catch (e) {
       console.warn(`[llm] answer fell back: ${why(e)}`);
     }
   }
   const top = memories[0];
-  return { answer: parseMemory(top.text).body, cites: [top.code] };
+  return { answer: parseMemory(top.text).body, cites: [top.code], source: "fallback" };
+}
+
+// ---------- the memory switch: the same question, with no memory ----------
+
+const BlankSchema = z.object({ answer: z.string() });
+
+/** What a capable model says about the project when it has never seen it: no recall, no memories, only the name. */
+export async function answerWithoutMemory(question: string, roomName: string): Promise<{ answer: string; source: "llm" | "fallback" }> {
+  if (env.llmEnabled()) {
+    try {
+      const { output } = await gen({
+        model: lm("fast"),
+        system: `You are a capable AI assistant with no memory of the project "${roomName}": no notes, no decisions, no history.
+Answer the CEO's question about it in at most 3 short sentences. Do not invent anything about this project.
+If the answer depends on its history, say what you would need to know. ${STYLE}`,
+        prompt: `Question: ${question}`,
+        output: Output.object({ schema: BlankSchema }),
+        temperature: 0.2,
+        abortSignal: patience(30_000),
+      });
+      return { answer: output.answer, source: "llm" };
+    } catch (e) {
+      console.warn(`[llm] no-memory answer fell back: ${why(e)}`);
+    }
+  }
+  return { answer: `With no memory, the crew knows nothing about ${roomName}: not what you decided, what broke or what is next.`, source: "fallback" };
 }
 
 // ---------- creator studio: draft in the CEO's voice ----------

@@ -7,6 +7,8 @@ import {
   type ChatReply,
   type ChatRequest,
   type ChatResponse,
+  type CompareRequest,
+  type CompareResponse,
   type DraftRequest,
   type DraftResponse,
   type DraftRule,
@@ -15,7 +17,7 @@ import {
   type Room,
 } from "./contract.ts";
 import { ActionError } from "./actions.ts";
-import { composeDraft, crewChat, DOMAIN, SPEAKERS, type CodedMemory, type Speaker } from "./llm.ts";
+import { answerFromMemory, answerWithoutMemory, composeDraft, crewChat, DOMAIN, SPEAKERS, withoutCodes, type CodedMemory, type Speaker } from "./llm.ts";
 import { parseMemory } from "./memory/format.ts";
 import { recall } from "./memory/walrus.ts";
 import { CEO_NAMESPACE } from "./rooms.ts";
@@ -129,4 +131,37 @@ export async function chat(room: Room, req: ChatRequest): Promise<ChatResponse> 
       ? { type: p.type, agent: FILED_BY[p.type], text: proposalText, capture: `${CAPTURE_PREFIX[p.type]} ${proposalText}` }
       : null;
   return { roomId: room.id, replies, proposal, recalled: memories.length, source: out.source, model: out.model };
+}
+
+// ---------- the memory switch ----------
+
+const NOTHING = "Nothing in this room's memory answers that yet.";
+
+/**
+ * The same question asked twice: once of a model that has never seen the project (no recall), once of the
+ * room's memory on Walrus (the same recall and answer as Telegram's /ask). Stores nothing.
+ */
+export async function compare(room: Room, req: CompareRequest): Promise<CompareResponse> {
+  const question = typeof req?.question === "string" ? req.question.trim() : "";
+  if (!question) throw new ActionError("Ask one question: { question }.");
+  if (question.length > MAX_INPUT) throw new ActionError(`Keep the question under ${MAX_INPUT} characters.`);
+
+  const [blank, recalled] = await Promise.all([
+    answerWithoutMemory(question, room.name),
+    (async () => {
+      const memories = await recallCoded(room, question, "compare", "researcher", { roomLimit: 8, ceoLimit: 0 });
+      return { memories, answer: await answerFromMemory(question, room.name, memories) };
+    })(),
+  ]);
+
+  const { memories, answer } = recalled;
+  const byCode = new Map(memories.map((m) => [m.code, m.blobId]));
+  const cites = [...new Set(answer.cites.map((c) => byCode.get(c)).filter((b): b is string => !!b))];
+  return {
+    roomId: room.id,
+    question,
+    withoutMemory: { text: withoutCodes(blank.answer), cites: [], source: blank.source },
+    // Receipts or it didn't happen: an answer with no real citation is not presented as memory.
+    withMemory: { text: cites.length ? withoutCodes(answer.answer) : NOTHING, cites, source: answer.source, recalled: memories.length },
+  };
 }
