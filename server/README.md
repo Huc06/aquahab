@@ -28,7 +28,7 @@ this server through a same-origin `/api` proxy (`web/next.config.ts`).
 | 08:30 (per room) | One brief per room on Telegram and in the office. One section per crew member; every line cites blob ids; 👍 / 👎 | 3 `recall`s (room recent, room risks, CEO prefs) |
 | Any time | `d:` `f:` `n:` `done:` `l:` `due:` `s:` `p:` quick capture, or a free note the crew turns into proposals | Keeper `remember`, signed by the filer |
 | 21:00 (per room) | "How did today go?" The reply becomes proposals; the CEO keeps or drops each | Kept ones only |
-| 👎 + reason | "Too long, keep it to five lines" becomes a feedback memory in `aquahab:ceo`; every later brief follows it | Keeper `remember` |
+| 👎 + reason | "Too long, keep it to five lines" becomes a feedback memory in `aquahab:ceo`. Every later brief written by the model gets it, and the Keeper's section names it with its receipt ("I gave the crew your feedback from 7 Nov on …") | Keeper `remember`, then `recall` (CEO prefs) |
 
 Memory line format (recall has no tag filters, so the type lives in the text):
 `[decision][aquahab][2026-11-04][by:one] Use Tatum GraphQL for events; JSON-RPC returns 404`
@@ -121,7 +121,7 @@ Shapes: [`src/contract.ts`](src/contract.ts). Reads are public; writes (✱) nee
 - **Receipts or it didn't happen.** The model sees memories as codes (`m1`, `c1`), cites codes, and the server
   maps them to blob ids and drops any line whose citations are not in the recall set.
 - **Empty recall is "unknown", not "nothing".** Recall is retried once and cross-checked against the Keeper's
-  ledger; a brief built from the ledger is marked `degraded`.
+  ledger; a brief built from the ledger is marked `degraded`. The CEO recall falls back to the ledger the same way.
 - **Paced writes.** ~2.7 s between writes on the account and ~5.2 s per key (mainnet allows about 24/min per
   account and 12/min per key), `retry_after` honoured on 429, account-wide idempotency keys prefixed `aq:<room>:`.
 - **Redaction before every write** (the managed relayer sees plaintext): API keys, bot tokens, bare 32-byte hex

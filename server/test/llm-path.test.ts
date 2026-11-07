@@ -4,7 +4,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Brief, ChatResponse, DraftResponse, MemoriesResponse, Room, Standup } from "../src/contract.ts";
+import type { Brief, ChatResponse, DraftResponse, MemoriesResponse, MemoryJob, Room, Standup } from "../src/contract.ts";
 
 const seen: { system: string; user: string; format: any; model: string }[] = [];
 let server: Server;
@@ -209,5 +209,24 @@ describe("LLM path (OpenAI-compatible provider)", () => {
     expect(req.system).toContain("compare every next memory with every done memory");
     expect(req.system).toContain("A decision is not a task");
     expect(req.system).toContain("Never make up a next step that no memory states");
+  });
+
+  it("names the CEO feedback the crew read, with its receipt", async () => {
+    const first = await call<Brief>("POST", `/api/rooms/${room.id}/brief`);
+    const fb = await call<{ job: MemoryJob }>("POST", `/api/briefs/${first.json.id}/feedback`, { rating: "down", reason: "Too long, keep it to five lines." });
+    for (let i = 0; i < 5; i++) await processQueue({ sleep: async () => {} });
+    const stored = (await call<MemoryJob>("GET", `/api/memory-jobs/${fb.json.job.jobId}`)).json;
+    expect(stored.status).toBe("stored");
+
+    const next = await call<Brief>("POST", `/api/rooms/${room.id}/brief`);
+    const keeper = next.json.sections.find((s) => s.agent === "keeper")!;
+    const named = keeper.lines.filter((l) => l.text.startsWith("I gave the crew your"));
+    expect(named).toHaveLength(1);
+    expect(named[0].text).toMatch(/^I gave the crew your feedback from \d{1,2} [A-Z][a-z]{2} on the LLM room brief \(day \d+\): not useful, "Too long, keep it to five lines"\.$/);
+    expect(named[0].cites).toEqual([stored.blobId]);
+    expect(keeper.lines[0].text).toMatch(/memories in this room/); // the count stays first
+
+    const req = seen.filter((s) => s.system.includes("morning brief")).at(-1)!;
+    expect(req.user).toContain("Too long, keep it to five lines"); // the model was given it
   });
 });

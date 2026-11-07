@@ -112,6 +112,13 @@ describe("the daily loop", () => {
     expect(json.job.agent).toBe("keeper");
   });
 
+  it("never says the crew read the feedback when no model wrote the brief", async () => {
+    await drain();
+    const { json } = await call<Brief>("POST", `/api/rooms/${room.id}/brief`);
+    expect(json.source).toBe("fallback");
+    expect(json.sections.flatMap((s) => s.lines).some((l) => l.text.startsWith("I gave the crew"))).toBe(false);
+  });
+
   it("lists the room's memory wall with types and authors", async () => {
     await drain();
     const { json } = await call<MemoriesResponse>("GET", `/api/rooms/${room.id}/memories`);

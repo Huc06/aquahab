@@ -8,6 +8,7 @@ import { env } from "./env.ts";
 import { one, q } from "./db.ts";
 import { emit } from "./events.ts";
 import { composeBrief, type CodedMemory } from "./llm.ts";
+import { parseMemory } from "./memory/format.ts";
 import { recall } from "./memory/walrus.ts";
 import { CEO_NAMESPACE } from "./rooms.ts";
 import { localParts, newId } from "./util.ts";
@@ -41,9 +42,15 @@ export async function recallForBrief(room: Room): Promise<RecalledSet> {
     }
   }
   roomHits.sort((a, b) => dateOf(b.text).localeCompare(dateOf(a.text)));
+  let ceoHits = ceo.hits;
+  if (!ceoHits.length) {
+    // The same for the CEO namespace: a 👎 filed last night must reach this morning's brief.
+    const stored = await q(`select blob_id, text from memory_jobs where namespace = $1 and status = 'stored' order by stored_at desc limit 10`, [CEO_NAMESPACE]);
+    ceoHits = stored.map((s) => ({ blob_id: s.blob_id, text: s.text, distance: 0 }));
+  }
   return {
     room: roomHits.slice(0, 40).map((h, i) => ({ code: `m${i + 1}`, blobId: h.blob_id, text: h.text })),
-    ceo: ceo.hits.map((h, i) => ({ code: `c${i + 1}`, blobId: h.blob_id, text: h.text })),
+    ceo: ceoHits.map((h, i) => ({ code: `c${i + 1}`, blobId: h.blob_id, text: h.text })),
     degraded,
   };
 }
@@ -66,7 +73,30 @@ export function emptyBrief(room: Room): BriefSection[] {
   ];
 }
 
-async function keeperSection(room: Room, recalled: number, degraded: boolean): Promise<BriefSection> {
+const DAY_MONTH = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const unquote = (s: string) => s.trim().replace(/[.\s]+$/, "");
+
+/**
+ * The CEO preferences and feedback the model was given, newest first, as Keeper lines with their receipts.
+ * Said only when a model wrote the brief: the fallback brief does not read them.
+ */
+export function ceoLines(told: CodedMemory[], max = 2): BriefSection["lines"] {
+  return told
+    .map((m) => ({ m, p: parseMemory(m.text) }))
+    .filter(({ p }) => p.type === "feedback" || p.type === "preference")
+    .sort((a, b) => (b.p.date ?? "").localeCompare(a.p.date ?? ""))
+    .slice(0, max)
+    .map(({ m, p }) => {
+      const from = p.date ? ` from ${DAY_MONTH.format(new Date(`${p.date}T00:00:00Z`))}` : "";
+      const rated = p.type === "feedback" ? p.body.match(/^CEO found (.+?) (not useful|useful)(?::\s*(.+))?$/s) : null;
+      const text = rated
+        ? `I gave the crew your feedback${from} on ${rated[1]}: ${rated[2]}${rated[3] ? `, "${unquote(rated[3])}"` : ""}.`
+        : `I gave the crew your ${p.type}${from}: "${unquote(p.body)}".`;
+      return { text, cites: [m.blobId] };
+    });
+}
+
+async function keeperSection(room: Room, recalled: number, degraded: boolean, told: CodedMemory[]): Promise<BriefSection> {
   const s = await one<{ total: string; week: string; last: string | null }>(
     `select count(*) as total,
             count(*) filter (where stored_at > now() - interval '7 days') as week,
@@ -79,6 +109,7 @@ async function keeperSection(room: Room, recalled: number, degraded: boolean): P
       text: `${Number(s?.total ?? 0)} memories in this room, ${Number(s?.week ?? 0)} filed this week. I recalled ${recalled} from Walrus for this brief.`,
       cites: [],
     },
+    ...ceoLines(told),
   ];
   if (degraded) lines.push({ text: "Walrus recall came back empty, so this brief was built from my filing ledger. Retrying next time.", cites: [] });
   return { agent: "keeper", title: CREW.keeper.section, lines };
@@ -121,7 +152,7 @@ export async function runBrief(room: Room, kind: Brief["kind"] = "manual"): Prom
       .filter((s) => s.lines.length);
     if (!sections.length) sections = emptyBrief(room);
   }
-  sections.push(await keeperSection(room, recalledSet.room.length, recalledSet.degraded));
+  sections.push(await keeperSection(room, recalledSet.room.length, recalledSet.degraded, source === "llm" ? recalledSet.ceo : []));
 
   const order: Role[] = ["one", "builder", "researcher", "hippo", "lofi", "keeper"];
   sections.sort((a, b) => order.indexOf(a.agent) - order.indexOf(b.agent));
