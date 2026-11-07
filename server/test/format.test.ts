@@ -11,6 +11,12 @@ describe("memory line format", () => {
     expect(p).toMatchObject({ type: "failure", room: "aquahab", date: "2026-11-03", by: "builder", supersedes: "abc", body: "SuiGrpcClient fails against Tatum gRPC" });
   });
 
+  it("reads a contractor's line: its type, room and date, and no crew author (the chain names the key)", () => {
+    const line = formatMemory({ type: "done", room: "aquahab", date: "2026-11-08", by: "contractor", body: "/compare merged in #27" });
+    expect(line).toBe("[done][aquahab][2026-11-08][by:contractor] /compare merged in #27");
+    expect(parseMemory(line)).toMatchObject({ type: "done", room: "aquahab", date: "2026-11-08", by: null, body: "/compare merged in #27" });
+  });
+
   it("reads free text written by another agent without inventing fields", () => {
     const p = parseMemory("Claude Code: refactored the keeper queue");
     expect(p.type).toBeNull();

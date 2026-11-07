@@ -79,7 +79,8 @@ in-memory `MemWalMock`; the server refuses both flags when `NODE_ENV=production`
 |---|---|
 | `pnpm check` | typecheck + tests (the whole daily loop against `MemWalMock`, no network) |
 | `pnpm keys` | generate missing keys and secrets; prints only public values |
-| `pnpm account status \| create \| hire-all \| hire <role> \| fire <role> \| hire-contractor <label> <pubkey>` | the payroll desk, signed by the owner key, submitted through Tatum (`--direct` for Mysten's fullnode) |
+| `pnpm account status \| create \| hire-all \| hire <role> \| fire <role> \| hire-contractor <label> <pubkey> \| fire-contractor <pubkey>` | the payroll desk, signed by the owner key, submitted through Tatum (`--direct` for Mysten's fullnode) |
+| `pnpm contractor keygen \| remember <room-slug> "<line>" [--api <url>] [--dry-run]` | Claude Code as a contractor: its own delegate key in `.env.contractor.local` (never committed or deployed). Its lines go straight to Walrus in the crew's format, `[done][aquahab][…][by:contractor]`, and the chain names its key. The CEO's approval is the hire; firing the key ends it. The Keeper's count reads the Walrus listing, so a contractor's memory counts too |
 | `pnpm probe` | read-only mainnet checks → `docs/FACTS.md` |
 | `pnpm verify` | every memory on the relayer matched to its Blob object on Sui (namespace and author from Blob metadata) → `docs/PROOF.md` |
 | `pnpm seed-room <slug> <file> [--api <url>] [--dry-run]` | file prepared memories (one prefixed line each) through the normal capture path; real mainnet writes, so true lines only. `p:` is refused: preferences live in `aquahab:ceo` and every room's brief reads them |
