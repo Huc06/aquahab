@@ -167,4 +167,12 @@ describe("seed file", () => {
     expect(bad.errors).toHaveLength(2);
     expect(bad.errors[0]).toContain("line 1");
   });
+
+  it("refuses preference lines: they go to the CEO namespace and would shape every room's brief", () => {
+    const { lines, errors } = parseSeedFile("s: Voice: short and direct\np: Briefs: lead with the post to write today\npref: one line only\n");
+    expect(lines.map((l) => l.type)).toEqual(["story"]);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toContain("line 2");
+    expect(errors[0]).toContain("every room");
+  });
 });

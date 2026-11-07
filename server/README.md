@@ -81,7 +81,7 @@ in-memory `MemWalMock`; the server refuses both flags when `NODE_ENV=production`
 | `pnpm account status \| create \| hire-all \| hire <role> \| fire <role> \| hire-contractor <label> <pubkey>` | the payroll desk, signed by the owner key, submitted through Tatum (`--direct` for Mysten's fullnode) |
 | `pnpm probe` | read-only mainnet checks → `docs/FACTS.md` |
 | `pnpm verify` | every memory on the relayer matched to its Blob object on Sui (namespace and author from Blob metadata) → `docs/PROOF.md` |
-| `pnpm seed-room <slug> <file> [--api <url>] [--dry-run]` | file prepared memories (one prefixed line each) through the normal capture path; real mainnet writes, so true lines only |
+| `pnpm seed-room <slug> <file> [--api <url>] [--dry-run]` | file prepared memories (one prefixed line each) through the normal capture path; real mainnet writes, so true lines only. `p:` is refused: preferences live in `aquahab:ceo` and every room's brief reads them |
 | `pnpm db:copy` | one-time cut-over: copy the local PGlite ledger (rooms, briefs, board, pairing) into `DATABASE_URL` |
 | `pnpm contract:sync` | copy `src/contract.ts` to `web/src/lib/api-types.ts` (CI checks they match) |
 
