@@ -199,10 +199,12 @@ export async function setSetting(key: string, value: unknown) {
 }
 
 /** Read-through cache with a TTL, so pages poll the server and never Tatum or the relayer directly. */
-export async function cached<T>(key: string, ttlSeconds: number, load: () => Promise<T>): Promise<T> {
+/** `keep` says whether a loaded value is complete enough to cache; an incomplete one is loaded again next time. */
+export async function cached<T>(key: string, ttlSeconds: number, load: () => Promise<T>, keep?: (value: T) => boolean): Promise<T> {
   const hit = await one<{ value: T }>(`select value from cache where key = $1 and expires_at > now()`, [key]);
   if (hit) return hit.value;
   const value = await load();
+  if (keep && !keep(value)) return value;
   await q(
     `insert into cache (key, value, expires_at) values ($1, $2::jsonb, now() + ($3 || ' seconds')::interval)
      on conflict (key) do update set value = excluded.value, expires_at = excluded.expires_at`,

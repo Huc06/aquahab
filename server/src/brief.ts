@@ -88,7 +88,7 @@ export function ceoLines(told: CodedMemory[], max = 2): BriefSection["lines"] {
     .slice(0, max)
     .map(({ m, p }) => {
       const from = p.date ? ` from ${DAY_MONTH.format(new Date(`${p.date}T00:00:00Z`))}` : "";
-      const rated = p.type === "feedback" ? p.body.match(/^CEO found (.+?) (not useful|useful)(?::\s*(.+))?$/s) : null;
+      const rated = p.type === "feedback" ? p.body.match(/^CEO found (.+?) (not useful|useful)(?::\s*(.+?))?\.?$/s) : null;
       const text = rated
         ? `I gave the crew your feedback${from} on ${rated[1]}: ${rated[2]}${rated[3] ? `, "${unquote(rated[3])}"` : ""}.`
         : `I gave the crew your ${p.type}${from}: "${unquote(p.body)}".`;

@@ -268,7 +268,8 @@ export async function receiptView(blobId: string): Promise<MemoryReceipt> {
       storedAt: last?.at ?? null,
       links: { suiscan: hit ? suiscanObject(hit.objectId) : null, walruscan: walruscanBlob(blobId) },
     };
-  });
+    // A blob the chain index has not seen yet (just stored) is asked again next time, not held for 5 minutes.
+  }, (r) => r.blobObjectId !== null);
 }
 
 // ---------- health and proof ----------
