@@ -55,7 +55,17 @@ const gen = (async (opts: Parameters<typeof generateText>[0]) => {
 const patience = (ms: number) => AbortSignal.timeout(env.llmProvider() === "ollama" ? ms * 4 : ms);
 
 const STYLE = `Write plain, concrete English. Short lines. No filler, no emojis, no em dashes, no hype.
-Never invent facts, names, dates or numbers that are not in the memories.`;
+Never invent facts, names, dates or numbers that are not in the memories.
+Memory codes (m1, c2) go in cites only. Never write one in the text, not even in parentheses: say what the memory says.`;
+
+/** Drops memory codes a model wrote into its text anyway ("done (m1).", "(see m2, m3)"); cites carry them. */
+export function withoutCodes(text: string): string {
+  return text
+    .replace(/\s*\((?:see\s+)?[mc]\d+(?:\s*(?:,|and)\s*[mc]\d+)*\)/gi, "")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 export interface CodedMemory {
   code: string; // m1, m2, c1…
@@ -110,11 +120,20 @@ const LENS_RULE = `- The room goal and room lens are context. Use the lens label
   code for something only the goal says. Use it to decide what matters most.
 - Never link two memories by cause ("X is blocked because Y") unless a memory states that link.`;
 
+// Models restate finished work as next steps: a done memory rarely uses the words of the next step it closed, and
+// a failure that already says "fixed by" looks like a task. These rules decide what one may call open.
+const OPEN_RULE = `- What is open: before one speaks, compare every next memory with every done memory. If a done memory
+  describes the same work, even in other words or only part of it, that next step is closed: leave it out.
+- A failure is a next step only when its memory gives no fix, no done memory resolves it, and something is still
+  left to do. A failure that says "fixed by …", or a run that was missed in the past, is history for builder, not
+  a task for one.
+- A decision is not a task. Report it as a decision ("We read the roster through Tatum"), never as "implement …".`;
+
 const BRIEF_SYSTEM = `You are the crew of Aquahab, a project office. You write the CEO's morning brief for one project.
 The brief answers one question: where did we leave off, and what happens next?
 
 Each crew member writes only its own section:
-- one (Chief of Staff): the top 3 next steps, most important first. Draw on next, decision and failure memories.
+- one (Chief of Staff): the open next steps, most important first, at most 3, and the decisions they rest on.
 - builder (Head of Engineering): what changed and what broke recently, with the fix if known (done, failure).
 - researcher (Head of Research): open questions, and what was learned (learned).
 - hippo (Head of Finance & Ops): deadlines and commitments, with days left counted from today (deadline).
@@ -124,6 +143,9 @@ Rules:
 - Use only the memories given. Every line cites the codes of the memories it is based on (for example ["m3","m7"]).
 - When a memory says [supersedes:X], the newer one wins; do not report the older fact as current.
 - A next step that a later done memory completed is not a next step any more.
+${OPEN_RULE}
+- When no next step is open, one writes a single line saying so, cites the done memory that closed the last next
+  step, and asks the CEO what comes next. Never make up a next step that no memory states.
 - Leave out a section that has nothing real to say. Never pad.
 - A memory belongs to the section of its type. Never restate it in another section (a "learned" line needs a
   learned memory). Only one may also cite a failure or a done memory, to explain a next step.
@@ -154,7 +176,8 @@ export async function composeBrief(input: BriefInput): Promise<BriefDraft> {
         temperature: 0.2,
         abortSignal: patience(60_000),
       });
-      return { sections: inDomain(output.sections, input.memories), source: "llm", model: `${env.llmProvider()}:${env.llmModel()}` };
+      const sections = output.sections.map((s) => ({ ...s, lines: s.lines.map((l) => ({ ...l, text: withoutCodes(l.text) })) }));
+      return { sections: inDomain(sections, input.memories), source: "llm", model: `${env.llmProvider()}:${env.llmModel()}` };
     } catch (e) {
       console.warn(`[llm] brief fell back: ${why(e)}`);
     }
@@ -526,18 +549,24 @@ const STANDUP_SYSTEM = `You are the crew of Aquahab, a project office that remem
 short standup about one project. The members talk to each other, not to the CEO.
 
 Each member speaks only for its own domain:
-- one (Chief of Staff): decisions and next steps. one runs the standup: it opens with the most important next step.
+- one (Chief of Staff): decisions and next steps. one runs the standup: it opens with the most important open next step.
 - builder: what shipped and what failed. researcher: what was learned.
 - hippo: deadlines and commitments, with days left counted from today. lofi: story, voice and audience notes.
 
 Rules:
-- 3 to 8 turns, in the order they are said. Only the members listed under "Who is here" speak.
+- 2 to 8 turns, in the order they are said: as few as the memories need, never padded to reach a number.
+  Only the members listed under "Who is here" speak.
 - A turn speaks to the whole crew (to: null) or answers one member (to: that member). An answer reacts to what that
-  member just said: a handoff, a dependency, a risk, a question about their domain, or an update that closes a next step.
+  member just said: a handoff, a dependency, a risk, or an update that closes a next step. Ask a member a question
+  only when one of its memories answers it, and the answer says only what that memory states.
   The office shows who a turn answers, so do not open the text with that member's name.
 - At most 25 words per turn. Every turn cites the codes of the memories it rests on. A turn with nothing to cite is left out.
 - Outside one, a member states only facts from memories of its own types.
 - When a memory says [supersedes:X], the newer one wins. A next step that a later done memory completed is done, not open.
+${OPEN_RULE}
+- When no next step is open, one opens by saying so, citing the done memory that closed the last one, and says the
+  CEO sets the next one. Never make up a next step that no memory states.
+- No assessments, plans or audience claims that no memory states (not "no blockers", not "we target early adopters").
 - Never link two memories by cause unless a memory states that link.
 - Never invent facts, names, dates, numbers or opinions that are not in the memories. No small talk, no greetings.
 ${LENS_RULE}

@@ -11,10 +11,11 @@ Before #18 the office showed small talk only: twelve fixed lines, flavour with n
 
 1. **Recall first.** One recall of the room, newest first (`purpose: "standup"`, so the cited objects glow through `recall.used`).
 2. **Who speaks.** One runs it. Every other member joins only when the room has memories of its own types (`DOMAIN`). Fewer than two members means no standup (409 on demand).
-3. **Receipts or it didn't happen.** A turn whose cites are not in the recall is dropped. Outside One, a turn must cite at least one memory of the speaker's own types. A turn that answers someone who is not in the standup, or answers itself, becomes a turn to the whole crew.
-4. **Short.** At most 8 turns, about 25 words each (300 characters kept).
-5. **No new memory.** The standup is kept in the ledger (`standups` table), never on Walrus: it is a conversation about memories, not a memory. Committing anything still goes through `/capture`.
-6. **Never padded.** Without a model, or when none of the model's turns pass the checks, each member reads out its newest memory unchanged (`source: "fallback"`).
+3. **Receipts or it didn't happen.** A turn whose cites are not in the recall is dropped. A turn must cite at least one memory of the speaker's own types. One may also cite a done memory, to say a next step is closed, but never a failure alone: that is history turned into a task ("run the missed brief"), and the failure is Builder's to report. A turn that answers someone who is not in the standup, or answers itself, becomes a turn to the whole crew. Memory codes the model writes into the text (`(m1)`) are removed.
+4. **Short.** 2 to 8 turns, as few as the memories need, about 25 words each (300 characters kept).
+5. **Open means open.** One opens with the most important next step that no done memory has closed. When none is open, One says so and leaves the next step to the CEO. A question is asked only when a memory answers it. The morning brief follows the same rule for One's section.
+6. **No new memory.** The standup is kept in the ledger (`standups` table), never on Walrus: it is a conversation about memories, not a memory. Committing anything still goes through `/capture`.
+7. **Never padded.** Without a model, or when fewer than two of the model's turns pass the checks, each member reads out its newest memory unchanged (`source: "fallback"`).
 
 ## When it runs
 
@@ -33,3 +34,4 @@ Before #18 the office showed small talk only: twelve fixed lines, flavour with n
 - [x] AC-SU-03: Holding a standup files no memory job.
 - [x] AC-SU-04: The morning tick holds the standup after the brief.
 - [x] AC-SU-05: The office shows the standup when there is one, the small talk otherwise.
+- [x] AC-SU-06: One never opens with a next step a done memory closed, and never turns a failure alone into a task (server check on the turn; prompt checked live on 7 Nov: 5 runs on the `aquahab` room, none stale).

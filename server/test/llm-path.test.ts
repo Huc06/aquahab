@@ -4,7 +4,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { ChatResponse, DraftResponse, MemoriesResponse, Room, Standup } from "../src/contract.ts";
+import type { Brief, ChatResponse, DraftResponse, MemoriesResponse, Room, Standup } from "../src/contract.ts";
 
 const seen: { system: string; user: string; format: any; model: string }[] = [];
 let server: Server;
@@ -62,7 +62,7 @@ beforeAll(async () => {
                 { agent: "one", to: "lofi", text: "Made up.", cites: ["m42"] },
               ],
             };
-      } else if (system.includes("morning brief")) out = { sections: [{ agent: "one", lines: [{ text: "Ship the deploy.", cites: ["m1"] }] }] };
+      } else if (system.includes("morning brief")) out = { sections: [{ agent: "one", lines: [{ text: "Ship the deploy (m1).", cites: ["m1"] }] }] };
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(reply(out)));
     });
@@ -175,6 +175,8 @@ describe("LLM path (OpenAI-compatible provider)", () => {
     const req = seen.filter((s) => s.system.includes("short standup")).at(-1)!;
     expect(req.user).toMatch(/^Who is here: one, builder$/m);
     expect(req.user).toContain("Room goal: Ship it");
+    expect(req.system).toContain("compare every next memory with every done memory");
+    expect(req.system).toContain("When no next step is open, one opens by saying so");
   });
 
   it("reads the memories out when none of the model's turns survive", async () => {
@@ -198,5 +200,14 @@ describe("LLM path (OpenAI-compatible provider)", () => {
     const req = seen.filter((s) => s.system.includes("morning brief")).at(-1)!;
     expect(req.user).toContain("Room goal: Ship it");
     expect(req.system).toContain("Use the lens labels");
+  });
+
+  it("keeps one to open next steps and keeps codes out of the text", async () => {
+    const r = await call<Brief>("POST", `/api/rooms/${room.id}/brief`);
+    expect(r.json.sections.find((s) => s.agent === "one")?.lines.map((l) => l.text)).toEqual(["Ship the deploy."]);
+    const req = seen.filter((s) => s.system.includes("morning brief")).at(-1)!;
+    expect(req.system).toContain("compare every next memory with every done memory");
+    expect(req.system).toContain("A decision is not a task");
+    expect(req.system).toContain("Never make up a next step that no memory states");
   });
 });
