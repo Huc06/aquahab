@@ -6,7 +6,7 @@
 // kept by the CEO, and feedback is the CEO's own rating. No autoSave, no analyze().
 import { FILED_BY, type MemoryJob, type MemoryType, type Role } from "../contract.ts";
 import { env } from "../env.ts";
-import { one, q } from "../db.ts";
+import { bust, one, q } from "../db.ts";
 import { emit } from "../events.ts";
 import { localParts, newId, sha256 } from "../util.ts";
 import { formatMemory, redact } from "./format.ts";
@@ -177,6 +177,7 @@ export async function processQueue(opts: { maxSubmit?: number; sleep?: (ms: numb
         if (r.status === "done" && r.blob_id) {
           const row = await one(`update memory_jobs set status='stored', blob_id=$2, error=null, stored_at=now(), updated_at=now() where id=$1 returning *`, [j.id, r.blob_id]);
           await q(`insert into memory_texts (blob_id, namespace, text) values ($1,$2,$3) on conflict (blob_id) do nothing`, [r.blob_id, j.namespace, j.text]);
+          await bust("chain-memories:"); // the next receipt reads the chain again and finds the new Blob
           if (j.candidate_id) await q(`update candidates set status='kept', job_id=$2 where id=$1`, [j.candidate_id, j.id]);
           const job = toJob(row!);
           result.stored.push(job);

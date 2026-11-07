@@ -3,7 +3,8 @@
 // feedback becomes a CEO memory → the memory wall lists everything.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../src/app.ts";
-import { closeDb } from "../src/db.ts";
+import { ceoLines } from "../src/brief.ts";
+import { cached, closeDb, q } from "../src/db.ts";
 import { processQueue } from "../src/memory/keeper.ts";
 import type { Brief, Candidate, MemoriesResponse, MemoryJob, Room } from "../src/contract.ts";
 
@@ -144,5 +145,40 @@ describe("the daily loop", () => {
 
   it("returns 404 for an unknown room", async () => {
     expect((await call("GET", "/api/rooms/nope/memories")).status).toBe(404);
+  });
+});
+
+describe("the Keeper's feedback lines", () => {
+  const ceo = (type: string, body: string, date = "2026-11-07") => ({ code: "c1", blobId: `blob-${type}`, text: `[${type}][ceo][${date}][by:keeper] ${body}` });
+
+  it("reads a rating with or without a reason, and a preference", () => {
+    expect(ceoLines([ceo("feedback", "CEO found the Aquahab brief (day 4) not useful.")])).toEqual([
+      { text: "I gave the crew your feedback from 7 Nov on the Aquahab brief (day 4): not useful.", cites: ["blob-feedback"] },
+    ]);
+    expect(ceoLines([ceo("feedback", "CEO found the Aquahab brief (day 4) not useful: Too long, keep it to five lines.")])[0].text).toBe(
+      'I gave the crew your feedback from 7 Nov on the Aquahab brief (day 4): not useful, "Too long, keep it to five lines".',
+    );
+    expect(ceoLines([ceo("preference", "Keep the brief short.", "2026-11-06")])[0].text).toBe('I gave the crew your preference from 6 Nov: "Keep the brief short".');
+  });
+});
+
+describe("caching proofs", () => {
+  it("does not keep a value the caller marks incomplete", async () => {
+    let loads = 0;
+    const load = async () => ({ n: ++loads });
+    await cached("t:incomplete", 300, load, () => false);
+    await cached("t:incomplete", 300, load, () => false);
+    expect(loads).toBe(2);
+    await cached("t:complete", 300, load);
+    await cached("t:complete", 300, load);
+    expect(loads).toBe(3);
+  });
+
+  it("does not cache a receipt the chain has not confirmed yet", async () => {
+    const blobId = (await call<MemoriesResponse>("GET", `/api/rooms/${room.id}/memories`)).json.memories[0].blobId;
+    const r = await call("GET", `/api/memories/${blobId}/receipt`);
+    expect(r.status).toBe(200);
+    expect(r.json.blobObjectId).toBeNull(); // no chain index in mock mode
+    expect(Number((await q(`select count(*) as n from cache where key = $1`, [`receipt:${blobId}`]))[0].n)).toBe(0);
   });
 });
