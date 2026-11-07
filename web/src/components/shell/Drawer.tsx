@@ -9,12 +9,14 @@ import { VaultPanel } from "@/components/memory/VaultPanel";
 import { BriefingPanel } from "@/components/briefing/BriefingPanel";
 import { BoardPanel } from "@/components/board/BoardPanel";
 import { ReviewPanel } from "@/components/review/ReviewPanel";
+import { MomentsPanel } from "@/components/moments/MomentsPanel";
 
 const TITLE: Record<Exclude<DrawerKind, null>, string> = {
   rooms: "Rooms",
   board: "Board",
   vault: "Memory",
   briefing: "Morning brief",
+  moments: "Rewind",
   agent: "Agent",
   review: "Evening debrief",
 };
@@ -86,6 +88,7 @@ export function Drawer() {
         {drawer === "board" && <BoardPanel />}
         {drawer === "vault" && <VaultPanel />}
         {drawer === "briefing" && <BriefingPanel />}
+        {drawer === "moments" && <MomentsPanel />}
         {drawer === "agent" && <AgentDetail />}
         {drawer === "review" && <ReviewPanel />}
       </div>
