@@ -1,6 +1,7 @@
 "use client";
 
 import { ChatPanel } from "@/components/chat/ChatPanel";
+import { MomentReplayOverlay } from "@/components/moments/MomentReplayOverlay";
 import { useHQ } from "@/lib/store";
 import { AgentTabs } from "./AgentTabs";
 import { Drawer } from "./Drawer";
@@ -20,6 +21,7 @@ export function HQOverlays() {
       <SideTabs />
       <Drawer />
       <ChatPanel />
+      <MomentReplayOverlay />
     </>
   );
 }
