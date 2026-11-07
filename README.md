@@ -18,6 +18,7 @@ Phase 1 (MVP): one private HQ, demo CEO session, operator-managed Walrus Memory,
 | `docs/architecture/` | `SYSTEM_DESIGN.md`, `DATA_MODEL.md`, `API_DESIGN.md` | Building services, models, routes |
 | `docs/features/` | One spec per feature: mission board, agent desk, Memory Vault, feedback loop, briefing, onboarding, agent governance, HQ scene | Building a feature |
 | `docs/research/` | `RESEARCH_TATUM.md` (Tatum AI Builder, Sui gRPC), `RESEARCH_LLM_AUTH.md` (LLM auth options) | Integration questions |
+| `docs/TOTAL_RECALL.md` | The hackathon entry: what was built, how Tatum and Walrus are used, live mainnet evidence, judging criteria → where to look | Judging, the blog, the video |
 | `docs/design/wireframes/` | Wireframe reference images | Comparing against the design |
 
 ## Reading order for a new contributor
