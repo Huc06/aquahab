@@ -451,6 +451,29 @@ export interface ChatResponse {
   model: string | null;
 }
 
+// ---------- the memory switch ----------
+
+/** POST /api/rooms/:id/compare. The same question answered without memory, then from the room's memory. Stores nothing. */
+export interface CompareRequest {
+  question: string;
+}
+
+export interface CompareAnswer {
+  text: string;
+  /** Blob ids the answer rests on. Always empty without memory. */
+  cites: string[];
+  source: "llm" | "fallback";
+}
+
+export interface CompareResponse {
+  roomId: string;
+  question: string;
+  /** A capable model that has never seen this project: no recall is made. */
+  withoutMemory: CompareAnswer;
+  /** The same question, answered only from what was recalled from Walrus. An answer that cites nothing says so. */
+  withMemory: CompareAnswer & { recalled: number };
+}
+
 // ---------- the crew standup ----------
 
 /** One turn of the standup: a member speaks to the crew (`to: null`) or answers another member. */

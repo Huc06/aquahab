@@ -4,7 +4,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Brief, ChatResponse, DraftResponse, MemoriesResponse, MemoryJob, Room, Standup } from "../src/contract.ts";
+import type { Brief, ChatResponse, CompareResponse, DraftResponse, MemoriesResponse, MemoryJob, Room, Standup } from "../src/contract.ts";
 
 const seen: { system: string; user: string; format: any; model: string }[] = [];
 let server: Server;
@@ -63,6 +63,11 @@ beforeAll(async () => {
               ],
             };
       } else if (system.includes("morning brief")) out = { sections: [{ agent: "one", lines: [{ text: "Ship the deploy (m1).", cites: ["m1"] }] }] };
+      else if (system.includes("with no memory of the project")) out = { answer: "I have no record of this project, so I cannot say how you read Sui." };
+      else if (system.includes("Answer the CEO's question")) {
+        const code = text.match(/^(m\d+) .*Tatum/m)?.[1] ?? "m0";
+        out = text.includes("Question: uncited") ? { answer: "Something I made up.", cites: ["m42"] } : { answer: `Through Tatum gRPC and GraphQL (${code}).`, cites: [code, "m42"] };
+      }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(reply(out)));
     });
@@ -153,6 +158,28 @@ describe("LLM path (OpenAI-compatible provider)", () => {
     expect(flakyFailed).toBe(true);
     expect(r.json.source).toBe("llm");
     expect(seen.length - before).toBe(2);
+  });
+
+  it("asks one question without memory and from memory: the blank side never sees a memory", async () => {
+    const before = seen.length;
+    const r = await call<CompareResponse>("POST", `/api/rooms/${room.id}/compare`, { question: "How do we read Sui?" });
+    expect(r.status).toBe(200);
+    expect(r.json.withoutMemory).toEqual({ text: "I have no record of this project, so I cannot say how you read Sui.", cites: [], source: "llm" });
+    expect(r.json.withMemory).toEqual({ text: "Through Tatum gRPC and GraphQL.", cites: [blobOf("Tatum")], source: "llm", recalled: 2 }); // m42 dropped, code out of the text
+    const calls = seen.slice(before);
+    expect(calls).toHaveLength(2);
+    const blank = calls.find((s) => s.system.includes("with no memory of the project"))!;
+    expect(blank.model).toBe("fake-fast");
+    expect(blank.user).toBe("Question: How do we read Sui?");
+    expect(blank.system + blank.user).not.toMatch(/Tatum|Listicles|Ship it|Brand Voice/); // no memory, goal or lens
+    const memory = calls.find((s) => s.system.includes("using only the memories given"))!;
+    expect(memory.model).toBe("fake-main");
+    expect(memory.user).toContain("Read Sui through Tatum gRPC and GraphQL");
+  });
+
+  it("does not present an uncited answer as memory", async () => {
+    const r = await call<CompareResponse>("POST", `/api/rooms/${room.id}/compare`, { question: "uncited" });
+    expect(r.json.withMemory).toEqual({ text: "Nothing in this room's memory answers that yet.", cites: [], source: "llm", recalled: 2 });
   });
 
   it("uses the fast model one-on-one", async () => {

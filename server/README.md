@@ -29,6 +29,7 @@ this server through a same-origin `/api` proxy (`web/next.config.ts`).
 | Any time | `d:` `f:` `n:` `done:` `l:` `due:` `s:` `p:` quick capture, or a free note the crew turns into proposals | Keeper `remember`, signed by the filer |
 | 21:00 (per room) | "How did today go?" The reply becomes proposals; the CEO keeps or drops each | Kept ones only |
 | 👎 + reason | "Too long, keep it to five lines" becomes a feedback memory in `aquahab:ceo`. Every later brief written by the model gets it, and the Keeper's section names it with its receipt ("I gave the crew your feedback from 7 Nov on …") | Keeper `remember`, then `recall` (CEO prefs) |
+| `/compare question` | The memory switch: the same question answered by a model that has never seen the project, then from the room's memory with receipts. Stores nothing | 1 `recall` (room), none for the blank side |
 
 Memory line format (recall has no tag filters, so the type lives in the text):
 `[decision][aquahab][2026-11-04][by:one] Use Tatum GraphQL for events; JSON-RPC returns 404`
@@ -102,6 +103,7 @@ Shapes: [`src/contract.ts`](src/contract.ts). Reads are public; writes (✱) nee
 | `GET /api/memory-jobs/:jobId` · `GET /api/memory-jobs?roomId=` · `POST …/retry` ✱ | `queued → pending → stored` (or `failed`) with `blobId` |
 | `POST /api/rooms/:id/draft` ✱ | `{ idea, agent?, refine?, previous? }` → a draft in the room's voice plus the memories it followed or avoided (blob ids). Stores nothing |
 | `POST /api/rooms/:id/chat` ✱ | `{ message, agent: role | "all" }` → replies from the members with relevant memories, each citing blob ids, plus an optional proposal to commit through `/capture`. Stores nothing |
+| `POST /api/rooms/:id/compare` ✱ | `{ question }` → `withoutMemory` (no recall: the model gets only the room name) and `withMemory` (recall + answer, citing blob ids; an answer that cites nothing says so). Stores nothing |
 | `GET /api/rooms/:id/memories` | the room wall: relayer listing joined with Sui (Blob object, end epoch, on-chain author) |
 | `GET /api/rooms/:id/recall?q=` | search the room's memory |
 | `GET /api/memories/:blobId/receipt` | one memory's on-chain receipt via Tatum: Blob object, namespace, write tx, checkpoint |
