@@ -186,3 +186,16 @@ Spec: `docs/features/hq-scene.md`, section "Current build". This section overrid
 **Why:** the labels must not show data the server did not return. The crew should look alive without pretending to know more than the server does.
 
 **How to apply:** new scene labels read from the API. Do not add a status or a task to a label unless the server reports it.
+
+## 14. Contractor writes go straight to Walrus, v3.3 (2026-11-08)
+
+Code: `server/scripts/contractor.ts` (PR #29). This is an exception to §11.3, which says the Keeper is the only write path.
+
+1. **A contractor is a labelled key on the payroll.** Claude Code gets its own delegate key, hired and fired on-chain by the owner (`pnpm account hire-contractor` and `fire-contractor`). Its key lives in `server/.env.contractor.local`, which is git-ignored and never deployed.
+2. **Contractor writes bypass the Keeper.** `pnpm contractor remember` writes a true line straight to Walrus, signed by the contractor key. The CEO's approval is the hire, and firing the key ends it.
+3. **Preferences and feedback stay with the CEO.** The contractor cannot file `p:` or 👎 feedback.
+4. **The contractor's memories count** toward the room total, because the Keeper's count reads the Walrus listing.
+
+**Why:** Claude Code works on the project outside the server, so routing its notes through the server would put the server in the middle of a Telegram-free workflow. The on-chain key keeps authorship visible.
+
+**How to apply:** a new write path needs its own key on the payroll, its own line in this section, and a CEO hire. Do not let other clients call Walrus without one.
