@@ -4,6 +4,14 @@ A 3D habitat where a CEO runs a company of AI agents that remember missions, pre
 
 Phase 1 (MVP): one private HQ, demo CEO session, operator-managed Walrus Memory, on-mission agents, manual renewal.
 
+## For judges (Total Recall, Track 02)
+
+- **Live office:** https://aquahab.up.railway.app. Reads are public. Open the office, then look at the Vault and a brief line: each memory has a receipt (Walrus blob ID, Sui object, checkpoint).
+- **Live proof:** `/api/proof` compares the memories on the relayer with the Blob objects on Sui. `/api/crew` reads the crew from Sui through Tatum.
+- **Hackathon entry:** `docs/TOTAL_RECALL.md` maps every judging criterion to where it is shown.
+- **Run it without keys:** `cd server && pnpm install && pnpm dev:mock`, then `cd web && pnpm dev`, open http://localhost:3000. This uses an in-memory Walrus mock and does not write to mainnet.
+- **Run against mainnet:** see `server/README.md`. The CEO works from Telegram; `/brief`, `/compare` and `/menu` are the commands to try.
+
 ## Where things are
 
 | Path | What it is | Read it when |
