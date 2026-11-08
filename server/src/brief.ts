@@ -9,7 +9,7 @@ import { one, q } from "./db.ts";
 import { emit } from "./events.ts";
 import { composeBrief, type CodedMemory } from "./llm.ts";
 import { parseMemory } from "./memory/format.ts";
-import { recall } from "./memory/walrus.ts";
+import { listNamespace, recall } from "./memory/walrus.ts";
 import { CEO_NAMESPACE } from "./rooms.ts";
 import { localParts, newId } from "./util.ts";
 
@@ -96,17 +96,31 @@ export function ceoLines(told: CodedMemory[], max = 2): BriefSection["lines"] {
     });
 }
 
+/** How many memories a listing holds, and how many of them are from the last 7 days. */
+export function tally(listed: { created_at: string }[], now = Date.now()): { total: number; week: number } {
+  const weekAgo = now - 7 * 86_400_000;
+  return { total: listed.length, week: listed.filter((m) => Date.parse(m.created_at) > weekAgo).length };
+}
+
+/** The room as Walrus lists it, so a contractor's write (made outside the Keeper) counts too; else the ledger. */
+async function roomTally(namespace: string): Promise<{ total: number; week: number }> {
+  try {
+    return tally(await listNamespace(namespace));
+  } catch {
+    const s = await one<{ total: string; week: string }>(
+      `select count(*) as total, count(*) filter (where stored_at > now() - interval '7 days') as week
+         from memory_jobs where namespace = $1 and status = 'stored'`,
+      [namespace],
+    );
+    return { total: Number(s?.total ?? 0), week: Number(s?.week ?? 0) };
+  }
+}
+
 async function keeperSection(room: Room, recalled: number, degraded: boolean, told: CodedMemory[]): Promise<BriefSection> {
-  const s = await one<{ total: string; week: string; last: string | null }>(
-    `select count(*) as total,
-            count(*) filter (where stored_at > now() - interval '7 days') as week,
-            max(stored_at) as last
-       from memory_jobs where namespace = $1 and status = 'stored'`,
-    [room.namespace],
-  );
+  const s = await roomTally(room.namespace);
   const lines = [
     {
-      text: `${Number(s?.total ?? 0)} memories in this room, ${Number(s?.week ?? 0)} filed this week. I recalled ${recalled} from Walrus for this brief.`,
+      text: `${s.total} memories in this room, ${s.week} filed this week. I recalled ${recalled} from Walrus for this brief.`,
       cites: [],
     },
     ...ceoLines(told),

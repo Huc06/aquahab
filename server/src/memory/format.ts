@@ -12,7 +12,8 @@ export interface MemoryLine {
   type: MemoryType;
   room: string; // room slug, or "ceo"
   date: string; // YYYY-MM-DD
-  by: Role;
+  /** The crew member who files it, or "contractor" for an outside key on the payroll (Claude Code). */
+  by: Role | "contractor";
   supersedes?: string | null;
   imported?: boolean;
   body: string;

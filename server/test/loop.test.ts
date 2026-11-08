@@ -3,7 +3,7 @@
 // feedback becomes a CEO memory → the memory wall lists everything.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../src/app.ts";
-import { ceoLines } from "../src/brief.ts";
+import { ceoLines, tally } from "../src/brief.ts";
 import { cached, closeDb, q } from "../src/db.ts";
 import { processQueue } from "../src/memory/keeper.ts";
 import type { Brief, Candidate, MemoriesResponse, MemoryJob, Room } from "../src/contract.ts";
@@ -159,6 +159,15 @@ describe("the Keeper's feedback lines", () => {
       'I gave the crew your feedback from 7 Nov on the Aquahab brief (day 4): not useful, "Too long, keep it to five lines".',
     );
     expect(ceoLines([ceo("preference", "Keep the brief short.", "2026-11-06")])[0].text).toBe('I gave the crew your preference from 6 Nov: "Keep the brief short".');
+  });
+});
+
+describe("the Keeper's count", () => {
+  it("counts every memory Walrus lists (a contractor's too), and the last 7 days apart", () => {
+    const now = Date.parse("2026-11-08T00:00:00Z");
+    const listed = [{ created_at: "2026-11-07T20:00:00Z" }, { created_at: "2026-11-04T08:48:47Z" }, { created_at: "2026-10-31T23:59:59Z" }];
+    expect(tally(listed, now)).toEqual({ total: 3, week: 2 });
+    expect(tally([], now)).toEqual({ total: 0, week: 0 });
   });
 });
 

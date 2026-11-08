@@ -7,7 +7,8 @@
 //   hire-all          register every crew member's delegate key that is not on the account yet
 //   hire <role>       register one crew member (label = its name, e.g. "Builder")
 //   fire <role>       remove one crew member's key: it can no longer write, or read anything filed after
-//   hire-contractor <label> <publicKeyHex>   register an outside key (e.g. a Claude Code plugin key)
+//   hire-contractor <label> <publicKeyHex>   register an outside key (e.g. Claude Code: `pnpm contractor keygen`)
+//   fire-contractor <publicKeyHex>           remove an outside key: it can no longer write, or read anything filed after
 //
 // Add --direct to use Mysten's public fullnode instead of Tatum.
 import "../src/net.ts"; // first: outbound HTTP settings
@@ -133,6 +134,21 @@ switch (cmd) {
     }
     const r = await addDelegateKey({ ...base, accountId: local().MEMWAL_ACCOUNT_ID!, publicKey: arg2.toLowerCase(), label: arg.slice(0, 64) });
     console.log(`Hired contractor "${arg}" ${route}: ${suiscanTx(r.digest)}`);
+    break;
+  }
+  case "fire-contractor": {
+    if (!arg || !/^[0-9a-f]{64}$/i.test(arg)) {
+      console.error("Usage: pnpm account fire-contractor <64-hex public key>");
+      process.exit(1);
+    }
+    for (const role of ROLES) {
+      if ((await pubOf(role).catch(() => null)) === arg.toLowerCase()) {
+        console.error(`That key is ${CREW[role].name}'s. Use \`pnpm account fire ${role}\`.`);
+        process.exit(1);
+      }
+    }
+    const r = await removeDelegateKey({ ...base, accountId: local().MEMWAL_ACCOUNT_ID!, publicKey: arg.toLowerCase() });
+    console.log(`Fired contractor ${arg.slice(0, 8)}… ${route}: ${suiscanTx(r.digest)}`);
     break;
   }
   default:
