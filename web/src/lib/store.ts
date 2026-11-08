@@ -1,9 +1,10 @@
 "use client";
 
 import { create } from "zustand";
+import type { MemoryMoment } from "./moments";
 import type { AgentId } from "./types";
 
-export type DrawerKind = "rooms" | "board" | "vault" | "briefing" | "agent" | "review" | null;
+export type DrawerKind = "rooms" | "board" | "vault" | "briefing" | "moments" | "agent" | "review" | null;
 export type ViewKind = "hq" | "city";
 
 // View state only. Business state comes from the crew server (see lib/api.ts).
@@ -20,6 +21,9 @@ interface HQState {
   roomsChanged: () => void;
   chatOpen: boolean;
   setChatOpen: (open: boolean) => void;
+  /** The stored memory currently playing in the full-screen REWIND sequence. */
+  replayMoment: MemoryMoment | null;
+  setReplayMoment: (moment: MemoryMoment | null) => void;
   musicOn: boolean;
   setMusicOn: (on: boolean) => void;
   view: ViewKind;
@@ -37,8 +41,10 @@ export const useHQ = create<HQState>((set) => ({
   roomsChanged: () => set((s) => ({ roomsVersion: s.roomsVersion + 1 })),
   chatOpen: false,
   setChatOpen: (open) => set({ chatOpen: open }),
+  replayMoment: null,
+  setReplayMoment: (moment) => set({ replayMoment: moment }),
   musicOn: false,
   setMusicOn: (on) => set({ musicOn: on }),
   view: "hq",
-  setView: (view) => set({ view, drawer: null, chatOpen: false }),
+  setView: (view) => set({ view, drawer: null, chatOpen: false, replayMoment: null }),
 }));

@@ -135,3 +135,121 @@ body {
 }
 .intro-bubbles { animation: intro-bubbles-gather 2.3s 0.2s cubic-bezier(0.4, 0, 0.2, 1) both; }
 .intro-flash { animation: intro-flash 0.6s 2.2s ease-in-out both; }
+
+
+/* REWIND: a short evidence-backed memory replay over the HQ. Animations use opacity and transforms
+   so the 3D canvas stays responsive. Reduced-motion users get the same stages without movement. */
+@keyframes moment-water-drift {
+  from { transform: translate3d(-2%, -1%, 0) scale(1.04); }
+  to { transform: translate3d(2%, 1%, 0) scale(1.08); }
+}
+@keyframes moment-postcard-travel {
+  0% { opacity: 0; transform: translateY(-44px) scale(1.03) rotate(-1deg); }
+  70% { opacity: 1; transform: translateY(38px) scale(0.78) rotate(0deg); }
+  100% { opacity: 1; transform: translateY(46px) scale(0.74); }
+}
+@keyframes moment-current-flow {
+  from { opacity: 0; transform: scaleY(0); transform-origin: top; }
+  25% { opacity: 1; }
+  to { opacity: 0.65; transform: scaleY(1); transform-origin: top; }
+}
+@keyframes moment-stored-rise {
+  from { opacity: 0; transform: translateY(18px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes moment-brief-rise {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.moment-card {
+  background-image: radial-gradient(circle at 100% 0, rgb(94 231 240 / 0.12), transparent 42%);
+}
+.moment-replay-water {
+  background:
+    radial-gradient(circle at 50% 18%, rgb(94 231 240 / 0.18), transparent 28%),
+    radial-gradient(circle at 82% 74%, rgb(77 162 255 / 0.13), transparent 25%);
+  animation: moment-water-drift 5s ease-in-out infinite alternate;
+}
+.moment-postcard-travel { animation: moment-postcard-travel 1.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.moment-memory-current { box-shadow: 0 0 20px rgb(94 231 240 / 0.85); animation: moment-current-flow 1.2s ease-out both; }
+.moment-stored-rise { animation: moment-stored-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.moment-brief-rise { animation: moment-brief-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+
+@keyframes moment-phase-rise {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes moment-phase-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(94 231 240 / 0.55); }
+  50% { box-shadow: 0 0 0 7px rgb(94 231 240 / 0); }
+}
+@keyframes moment-route-flow {
+  from { background-position: 0 0; }
+  to { background-position: 32px 0; }
+}
+@keyframes moment-vault-arrival {
+  from { opacity: 0; transform: translateY(16px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.moment-phase-rise { animation: moment-phase-rise 0.4s ease-out both; }
+.moment-phase-pulse { animation: moment-phase-pulse 1.15s ease-in-out infinite; }
+.moment-current-route::before {
+  position: absolute;
+  right: 10px;
+  left: 10px;
+  height: 2px;
+  content: "";
+  background: repeating-linear-gradient(90deg, rgb(94 231 240 / 0.25) 0 9px, rgb(94 231 240 / 0.9) 9px 16px, rgb(94 231 240 / 0.25) 16px 24px);
+  animation: moment-route-flow 0.7s linear infinite;
+}
+.moment-current-route > span { position: relative; z-index: 1; }
+.moment-vault-arrival { animation: moment-vault-arrival 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+
+/* Full-screen REWIND story: a single moment card is visible at a time. */
+@keyframes moment-story-enter {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes moment-vault-orb {
+  0%, 100% { box-shadow: 0 0 22px rgb(94 231 240 / 0.35); transform: scale(1); }
+  50% { box-shadow: 0 0 52px rgb(94 231 240 / 0.72); transform: scale(1.06); }
+}
+.moment-story-enter { animation: moment-story-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.moment-story-card { background-image: linear-gradient(145deg, rgb(15 32 56 / 0.98), rgb(5 11 23 / 0.98)); }
+.moment-story-glow { background: radial-gradient(circle at 78% 15%, rgb(94 231 240 / 0.2), transparent 35%); }
+.moment-story-vault { background: radial-gradient(circle at 50% 29%, rgb(94 231 240 / 0.18), transparent 31%); }
+.moment-story-brief { background: radial-gradient(circle at 100% 0, rgb(77 162 255 / 0.14), transparent 42%); }
+.moment-vault-orb { animation: moment-vault-orb 1.8s ease-in-out infinite; }
+
+
+/* The replay scrubber is a compact story-seek control, not a status stepper. */
+.moment-scrubber {
+  height: 4px;
+  cursor: pointer;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-memory), var(--color-border-interactive));
+  appearance: none;
+  -webkit-appearance: none;
+}
+.moment-scrubber::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  cursor: grab;
+  border: 2px solid var(--color-bg-deep);
+  border-radius: 999px;
+  background: var(--color-memory);
+  box-shadow: 0 0 0 1px var(--color-memory), 0 0 14px rgb(94 231 240 / 0.65);
+  appearance: none;
+  -webkit-appearance: none;
+}
+.moment-scrubber::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  cursor: grab;
+  border: 2px solid var(--color-bg-deep);
+  border-radius: 999px;
+  background: var(--color-memory);
+  box-shadow: 0 0 0 1px var(--color-memory), 0 0 14px rgb(94 231 240 / 0.65);
+}
