@@ -11,7 +11,10 @@ const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute:
 const SHOW_DESIGN_PREVIEW = process.env.NEXT_PUBLIC_ENABLE_REWIND_PREVIEW === "true";
 
 function statusCopy(moment: MemoryMoment) {
-  if (moment.impact === "used") return `Used in ${moment.citations.length} briefing${moment.citations.length === 1 ? "" : "s"}`;
+  if (moment.impact === "used") {
+    const briefs = new Set(moment.citations.map((citation) => citation.briefId)).size;
+    return `Used in ${briefs} briefing${briefs === 1 ? "" : "s"}`;
+  }
   if (moment.impact === "verified") return "Verified on Sui";
   return "Stored on Walrus";
 }

@@ -90,7 +90,9 @@ function ChangedCard({ moment }: { moment: MemoryMoment }) {
         <div className="border-t border-line-decor pt-4">
           {citation ? (
             <>
-              <p className="text-sm text-ok">A real brief cited this exact memory.</p>
+              <p className={moment.preview ? "text-sm text-warn" : "text-sm text-ok"}>
+                {moment.preview ? "Preview only: no brief cited this." : "A real brief cited this exact memory."}
+              </p>
               <p className="mt-1 text-[12px] text-fg-3">{dateTimeFormat.format(new Date(citation.briefCreatedAt))}</p>
               {!moment.preview && <div className="mt-3"><BlobReceiptPopover blobId={moment.memory.blobId} /></div>}
             </>
@@ -102,9 +104,14 @@ function ChangedCard({ moment }: { moment: MemoryMoment }) {
 }
 
 function StoryCard({ stage, moment }: { stage: number; moment: MemoryMoment }) {
-  if (stage === 0) return <CapturedCard moment={moment} />;
-  if (stage === 1) return <StoredCard moment={moment} />;
-  return <ChangedCard moment={moment} />;
+  const card = stage === 0 ? <CapturedCard moment={moment} /> : stage === 1 ? <StoredCard moment={moment} /> : <ChangedCard moment={moment} />;
+  if (!moment.preview) return card;
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <span className="rounded-full border border-warn px-3 py-1 font-mono text-[11px] uppercase tracking-[0.14em] text-warn">Preview · not real data</span>
+      {card}
+    </div>
+  );
 }
 
 function MomentReplayPlayer({ moment, onClose }: { moment: MemoryMoment; onClose: () => void }) {
