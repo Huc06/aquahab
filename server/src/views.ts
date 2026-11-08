@@ -128,7 +128,12 @@ export async function crewView(): Promise<CrewResponse> {
     }
     let history: CrewResponse["history"] = [];
     if (account && source === "tatum-grpc") {
-      history = (await delegateKeyEvents(account.owner, accountId).catch(() => [])).map((e) => ({
+      // A failed history read must not look like an empty history: log it, then show the crew without it.
+      const events = await delegateKeyEvents(account.owner, accountId).catch((e: unknown) => {
+        console.warn(`[crew] history: ${(e as Error).message}`);
+        return [];
+      });
+      history = events.map((e) => ({
         kind: e.kind,
         label: e.label ?? "",
         publicKey: e.publicKeyHex,
