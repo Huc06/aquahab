@@ -60,7 +60,7 @@ Tatum's free plan allows 3 requests a second (see `server/src/chain/tatum.ts`), 
 | The first memory, a decision filed by One: "Read the crew roster and memory Blobs from Sui through Tatum…" Its Blob [0x3d5f…a12a](https://suiscan.xyz/mainnet/object/0x3d5f8a2498136fa3a0d5b0d6972f50e81d97c67e97dbaddfaab1c5d921d8a12a) carries the namespace `aquahab:room:aquahab` and One's key on chain. Checkpoint 341503306. [Walruscan](https://walruscan.com/mainnet/blob/FxSi7LLYAEQ4-kLZxG7PE37tYq1mGiC1qeZt23PwJS0) | [6cW9GBSW…](https://suiscan.xyz/mainnet/tx/6cW9GBSWJWq1GiN6JU4HqAau5ZPZWx8oAdpx2Ca7AHYg) |
 
 - **Account:** `0x394fc2e4275efeb1b57a94eeff662c68fb2bd16a5d2e908e5fb475c9fd3ef986`.
-- **Known gap:** on 7–8 Nov the live hire history in `/api/crew` came back empty. The cause is not confirmed yet; logging for the failed read is in #30.
+- **Known gap:** Tatum's GraphQL gateway refuses event queries (`Failed to list events`), so the hire and fire event list in `/api/crew` is empty. Hire dates still come from the ledger. Logged as `[crew] history` by #30.
 - **Live counts:** [`/api/proof`](https://aquahab.up.railway.app/api/proof) shows memories on the relayer against Blob objects on chain, per namespace and per crew member. [`/api/crew`](https://aquahab.up.railway.app/api/crew) shows the roster read from Sui.
 - **Every memory on chain in the `aquahab` and `creator-journey` rooms is real.** As of 7 Nov that is 9 memories in two rooms. Two of the seven in `aquahab` are setup notes from 4 Nov. The persona room `creator-demo` is separate and labelled as a demo; it is not counted.
 
