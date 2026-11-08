@@ -32,7 +32,7 @@ Aquahab is an office with a crew of AI agents for each real project. The crew re
 | **Receipts from the chain** | For every memory, read through Tatum: <br>- its Blob object; <br>- the namespace and author stored in the Blob's own metadata (`memwal_namespace`, `memwal_agent_id`); <br>- the write transaction and its checkpoint; <br>- the storage end epoch. | `server/src/chain/sui.ts`, `server/src/views.ts` |
 | **3D office** | The crew at their desks, the brief with a Blob badge on every line, the memory wall and its receipts, live events over SSE. | `web/` |
 | **Telegram bot** | Paired to one CEO by code. Commands: <br>- `/brief`, `/debrief`, `/compare`, `/ask`, `/memories`, `/crew`; <br>- quick capture (`d:` decision, `f:` failure, `n:` next, `done:`, `l:` learned, `due:`, `s:` story, `p:` preference); <br>- 👍 / 👎 on every brief. | `server/src/telegram.ts` |
-| **Proof scripts** | `pnpm probe`: read-only mainnet checks, written to `docs/FACTS.md`. `pnpm verify`: every memory on the relayer matched to its Blob object on Sui, written to `docs/PROOF.md`. | `server/scripts/` |
+| **Proof scripts** | `pnpm probe`: read-only mainnet checks, written to `docs/FACTS.md`. `pnpm verify`: every memory on the relayer matched to its Blob object on Sui. It writes `docs/PROOF.md` when run; the file is not committed yet. | `server/scripts/` |
 | **Tests** | 78 server tests against the SDK's `MemWalMock`. They include: <br>- the daily loop end to end; <br>- the LLM path against a fake OpenAI-compatible server that misbehaves on purpose (made-up codes, members out of their domain); <br>- Telegram rendering. | `server/test/` |
 
 ## How Tatum is used
@@ -44,7 +44,7 @@ Aquahab is an office with a crew of AI agents for each real project. The crew re
 | Account creation and hires | Tatum gRPC, through the Sui SDK's `SuiGrpcClient` | `pnpm account` |
 | Chain, Sui epoch and checkpoint (`GetServiceInfo`) | Tatum native gRPC | `GET /api/health` and the office footer |
 
-Tatum's free plan allows 3 requests a second, so one token bucket keeps Aquahab at about 2. The office polls our server, which caches, and never calls Tatum directly.
+Tatum's free plan allows 3 requests a second (see `server/src/chain/tatum.ts`), so one token bucket keeps Aquahab at about 2. The office polls our server, which caches, and never calls Tatum directly.
 
 ## Live evidence on Sui mainnet
 
@@ -60,8 +60,9 @@ Tatum's free plan allows 3 requests a second, so one token bucket keeps Aquahab 
 | The first memory, a decision filed by One: "Read the crew roster and memory Blobs from Sui through Tatum…" Its Blob [0x3d5f…a12a](https://suiscan.xyz/mainnet/object/0x3d5f8a2498136fa3a0d5b0d6972f50e81d97c67e97dbaddfaab1c5d921d8a12a) carries the namespace `aquahab:room:aquahab` and One's key on chain. Checkpoint 341503306. [Walruscan](https://walruscan.com/mainnet/blob/FxSi7LLYAEQ4-kLZxG7PE37tYq1mGiC1qeZt23PwJS0) | [6cW9GBSW…](https://suiscan.xyz/mainnet/tx/6cW9GBSWJWq1GiN6JU4HqAau5ZPZWx8oAdpx2Ca7AHYg) |
 
 - **Account:** `0x394fc2e4275efeb1b57a94eeff662c68fb2bd16a5d2e908e5fb475c9fd3ef986`.
+- **Known gap:** on 7–8 Nov the live hire history in `/api/crew` came back empty. The cause is not confirmed yet; logging for the failed read is in #30.
 - **Live counts:** [`/api/proof`](https://aquahab.up.railway.app/api/proof) shows memories on the relayer against Blob objects on chain, per namespace and per crew member. [`/api/crew`](https://aquahab.up.railway.app/api/crew) shows the roster read from Sui.
-- **Every memory on chain comes from real work on these projects.** As of 7 Nov, that is 9 memories in two rooms. No memories were seeded or invented.
+- **Every memory on chain in the `aquahab` and `creator-journey` rooms is real.** As of 7 Nov that is 9 memories in two rooms. Two of the seven in `aquahab` are setup notes from 4 Nov. The persona room `creator-demo` is separate and labelled as a demo; it is not counted.
 
 ## Judging criteria: where to look
 
@@ -70,4 +71,4 @@ Tatum's free plan allows 3 requests a second, so one token bucket keeps Aquahab 
 | Walrus and Tatum integration | 30% | **Walrus Memory is the product:** <br>- one namespace per project; <br>- one delegate key per crew member; <br>- typed one-line memories; <br>- the brief, standup, `/compare` and debrief all recall before they speak. <br>**Tatum carries every chain read the office shows:** roster, Blob authorship, receipts and health. The payroll transactions go through it too. |
 | Technical quality (incl. "successful Tatum Sui RPC integration") | 30% | 78 tests and typed TypeScript. <br>- Every LLM call has a deterministic fallback. <br>- Codes the model invents are dropped, and a line with no real citation is not shown. <br>- The relayer's limits are paced, retries carry idempotency keys, and credentials are redacted before anything is stored. <br>- `pnpm probe` and `pnpm verify` check it all live. |
 | Creativity | 20% | **The crew is on payroll:** each agent's identity is a key on Sui, and every memory on chain records which agent wrote it. **Memory visibly changes the work:** the CEO's 👎 shows up in the next brief with its receipt, and `/compare` puts the answer without memory next to the answer with it. |
-| Presentation | 20% | The live office and bot, this document, the server README, the demo video and the blog post. |
+| Presentation | 20% | The live office and bot, this document, the server README, and, once published, the demo video and the blog post. |
