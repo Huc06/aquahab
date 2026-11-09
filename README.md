@@ -191,17 +191,48 @@ Server tests cover the daily loop, redaction, idempotency, citation validation, 
 
 Mainnet requires an operator-owned MemWal account, six delegate keys, a Tatum API key, an LLM provider, Telegram configuration, and a production Postgres database. Secrets are server-only. Follow [`server/README.md`](server/README.md) and [`docs/DEPLOY.md`](docs/DEPLOY.md); do not copy local secrets into issue threads, the browser, or the repository.
 
-## Repository map
+## Where to inspect the build
 
 ```text
-web/                     Next.js 16 + React 19 + React Three Fiber office
-server/                  Hono API, Keeper queue, Walrus, Tatum, Telegram, LLM
-docs/TOTAL_RECALL.md     Judge criterion map and live mainnet evidence
-docs/FACTS.md            Read-only mainnet probe transcript
-docs/FRICTION.md         Integration problems and mitigations
-docs/DEPLOY.md           Railway deployment guide
-server/test/             In-process integration and unit tests
+Aquahab/
+│
+├── web/                                  The judge-facing 3D office
+│   ├── src/app/page.tsx                   Full-screen HQ entry point
+│   ├── src/components/hq/                 Office model, roaming crew, scene labels
+│   ├── src/components/memory/             Vault and Blob receipt UI
+│   ├── src/components/briefing/           Cited morning brief UI
+│   └── src/components/chat/               CEO capture and crew conversation UI
+│
+├── server/                               The product and memory runtime
+│   ├── src/app.ts                         Hono API, CEO-write boundary, SSE, Telegram webhook
+│   ├── src/memory/keeper.ts               Redaction → queue → pacing → signed Walrus write → Blob ID
+│   ├── src/memory/walrus.ts               Walrus Memory client, recall, and local mock adapter
+│   ├── src/brief.ts                       Three-pass recall and citation-checked morning brief
+│   ├── src/actions.ts                     Capture, debrief candidates, CEO keep/drop decisions
+│   ├── src/standup.ts                     Crew conversation built from cited memories
+│   ├── src/studio.ts                      Draft and without-memory / with-memory comparison
+│   ├── src/telegram.ts                    Pairing, CEO bot controls, receipts, and magic web link
+│   ├── src/views.ts                       Relayer × Sui read models for Vault, crew, and proof
+│   ├── src/chain/sui.ts                   Tatum gRPC / GraphQL chain reads and Blob metadata
+│   └── test/                              Daily loop, queue, citations, Telegram, SSE, and fallback tests
+│
+├── docs/                                 Judge evidence and operating record
+│   ├── TOTAL_RECALL.md                    Track criterion map, live mainnet transactions, known gaps
+│   ├── FACTS.md                           Read-only mainnet probe transcript
+│   ├── FRICTION.md                        Integration failures and production mitigations
+│   └── DEPLOY.md                          Railway topology, secrets boundary, and smoke test
+│
+└── .github/workflows/ci.yml               Contract sync plus separate web and server checks
 ```
+
+| If you want to verify… | Start here | Follow it to |
+|---|---|---|
+| **A memory really reaches Walrus** | [`server/src/memory/keeper.ts`](server/src/memory/keeper.ts) | [`/api/memory-jobs`](https://aquahab.up.railway.app/api/memory-jobs) → Blob receipt → [Walruscan](https://walruscan.com/mainnet/blob/FxSi7LLYAEQ4-kLZxG7PE37tYq1mGiC1qeZt23PwJS0) |
+| **Memory changes a later output** | [`server/src/brief.ts`](server/src/brief.ts) | [`web/src/components/briefing/BriefingPanel.tsx`](web/src/components/briefing/BriefingPanel.tsx) → cited Blob badges |
+| **A crew member is a real on-chain identity** | [`server/src/chain/sui.ts`](server/src/chain/sui.ts) | [`server/src/views.ts`](server/src/views.ts) → [`/api/crew`](https://aquahab.up.railway.app/api/crew) |
+| **The office matches live data** | [`web/src/components/hq/HQScene.tsx`](web/src/components/hq/HQScene.tsx) | [`/api/crew`](https://aquahab.up.railway.app/api/crew) and room memory counts |
+| **The Telegram workflow is protected** | [`server/src/telegram.ts`](server/src/telegram.ts) | CEO pairing, brief receipts, capture lifecycle, and `/web` magic link |
+| **The system survives real failures** | [`docs/FRICTION.md`](docs/FRICTION.md) | Queue backoff, retry, timeout, degraded brief, and identifier conversion code |
 
 ## Scope and known limits
 
