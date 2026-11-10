@@ -111,8 +111,13 @@ export async function decide(decisions: CandidateDecision[], notify?: { chatId: 
   return jobs;
 }
 
+/** A feedback reason is one line a later brief can quote: no line breaks, at most REASON_MAX characters. */
+export const REASON_MAX = 200;
+export const isOneLineReason = (s: string) => !/[\r\n]/.test(s.trim()) && s.trim().length <= REASON_MAX;
+
 /** 👍 / 👎 on a brief becomes a feedback memory in the CEO namespace, which shapes every later brief. */
 export async function rateBrief(briefId: string, rating: "up" | "down", reason?: string, notify?: { chatId: number; messageId: number } | null): Promise<MemoryJob | null> {
+  if (reason?.trim() && !isOneLineReason(reason)) throw new ActionError(`Keep the reason to one line, ${REASON_MAX} characters at most.`);
   const brief = await getBrief(briefId);
   if (!brief) throw new ActionError("No such brief.");
   const room = await getRoom(brief.roomId);

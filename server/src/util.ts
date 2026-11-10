@@ -66,6 +66,10 @@ export function localParts(date: Date, timeZone: string) {
 
 export const isHHMM = (s: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 
+/** A room's brief or debrief time: "HH:MM", or "off" for a room the scheduler leaves alone (a persona room). */
+export const SCHEDULE_OFF = "off";
+export const isScheduleTime = (s: string) => s === SCHEDULE_OFF || isHHMM(s);
+
 export function minutesOf(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;

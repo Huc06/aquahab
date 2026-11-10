@@ -178,6 +178,7 @@ export async function processQueue(opts: { maxSubmit?: number; sleep?: (ms: numb
           const row = await one(`update memory_jobs set status='stored', blob_id=$2, error=null, stored_at=now(), updated_at=now() where id=$1 returning *`, [j.id, r.blob_id]);
           await q(`insert into memory_texts (blob_id, namespace, text) values ($1,$2,$3) on conflict (blob_id) do nothing`, [r.blob_id, j.namespace, j.text]);
           await bust("chain-memories:"); // the next receipt reads the chain again and finds the new Blob
+          await bust(`memories:${j.namespace}`); // and the Vault, refetching on memory.stored, lists it
           if (j.candidate_id) await q(`update candidates set status='kept', job_id=$2 where id=$1`, [j.candidate_id, j.id]);
           const job = toJob(row!);
           result.stored.push(job);

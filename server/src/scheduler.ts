@@ -10,7 +10,7 @@ import { runBrief } from "./brief.ts";
 import { runStandup } from "./standup.ts";
 import { askDebrief, deliverBrief } from "./telegram.ts";
 import { listRooms } from "./rooms.ts";
-import { localParts, minutesOf } from "./util.ts";
+import { localParts, minutesOf, SCHEDULE_OFF } from "./util.ts";
 import type { Room } from "./contract.ts";
 
 /** Fire a daily job when its local time has passed today, at most 3 hours late (so a restart at noon skips the 08:30 brief). */
@@ -61,7 +61,7 @@ export async function tick(now = new Date()): Promise<TickResult> {
 
 async function runDaily(room: Room, kind: "brief" | "debrief", local: ReturnType<typeof localParts>, out: TickResult) {
   const at = kind === "brief" ? room.briefAt : room.debriefAt;
-  if (!isDue(at, local)) return;
+  if (at === SCHEDULE_OFF || !isDue(at, local)) return; // "off": a persona room gets nothing on a schedule
   if (!(await claim(room.id, kind, local.date))) return;
   try {
     if (kind === "brief") {

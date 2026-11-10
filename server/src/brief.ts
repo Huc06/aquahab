@@ -11,7 +11,7 @@ import { composeBrief, type CodedMemory } from "./llm.ts";
 import { parseMemory } from "./memory/format.ts";
 import { listNamespace, recall } from "./memory/walrus.ts";
 import { CEO_NAMESPACE } from "./rooms.ts";
-import { localParts, newId } from "./util.ts";
+import { localParts, newId, SCHEDULE_OFF } from "./util.ts";
 
 const ROOM_RECENT_QUERY = "decisions, failures, shipped work, next steps and deadlines for this project";
 const ROOM_RISK_QUERY = "open blockers, failures, bugs and unfinished next steps";
@@ -66,7 +66,9 @@ export function emptyBrief(room: Room): BriefSection[] {
       title: CREW.one.section,
       lines: [
         { text: `This is day ${room.dayIndex} and I don't know ${room.name} yet. I have no memories to brief you from.`, cites: [] },
-        { text: `Tonight at ${room.debriefAt} I'll ask how the day went. Tell me what you decided, what broke and what's next.`, cites: [] },
+        room.debriefAt === SCHEDULE_OFF
+          ? { text: "Tell me what you decided, what broke and what's next, and I'll start from there.", cites: [] }
+          : { text: `Tonight at ${room.debriefAt} I'll ask how the day went. Tell me what you decided, what broke and what's next.`, cites: [] },
         { text: "Or capture it now: d: for a decision, f: for something that failed, n: for a next step.", cites: [] },
       ],
     },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CAPTURE_TYPES, helpHtml, MENU_ACTIONS, parseTimes, TIME_PRESETS, timesMarkup } from "../src/telegram.ts";
+import { CAPTURE_TYPES, helpHtml, MENU_ACTIONS, parseTimes, scheduleLine, TIME_PRESETS, timesMarkup } from "../src/telegram.ts";
 
 describe("New room and times choices", () => {
   it("parses a brief and debrief pair, one time, or private alone", () => {
@@ -21,9 +21,17 @@ describe("New room and times choices", () => {
         expect(Buffer.byteLength(b.callback_data ?? "")).toBeLessThanOrEqual(64);
         const [kind, action] = (b.callback_data ?? "").split(":");
         if (kind === "m") expect(MENU_ACTIONS).toContain(action);
-        if (kind === "tm") expect(b.callback_data).toMatch(/^tm:\d{4}:\d{4}$/);
+        if (kind === "tm") expect(b.callback_data).toMatch(/^tm:(\d{4}:\d{4}|off:off)$/);
       }
     }
+  });
+
+  it("says when a room's schedule is off, and how to turn it back on", () => {
+    const tz = "Asia/Ho_Chi_Minh";
+    expect(scheduleLine({ name: "Aquahab", briefAt: "08:30", debriefAt: "21:00", timezone: tz })).toBe("Aquahab: brief at 08:30, debrief at 21:00 (Asia/Ho_Chi_Minh).");
+    expect(scheduleLine({ name: "Creator Demo", briefAt: "off", debriefAt: "off", timezone: tz })).toBe(
+      "Creator Demo: brief off, debrief off (Asia/Ho_Chi_Minh). <code>/times 08:30 21:00</code> turns the schedule back on.",
+    );
   });
 
   it("the first preset is the room default used by createRoom", () => {
