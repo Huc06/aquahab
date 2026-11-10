@@ -12,6 +12,13 @@ import { DraftModal } from "@/components/draft/DraftModal";
 const DRAFTABLE: Role[] = ["one", "lofi", "researcher"];
 
 const button = "rounded-md border border-line px-3 py-1 text-sm text-fg focus-visible:outline-focus disabled:opacity-40";
+// A rating already sent: still a button in the same place, but done.
+const sentButton = "rounded-md border border-mem px-3 py-1 text-sm text-fg-2";
+
+// The server files the reason as one line of a memory: one line, at most 200 characters.
+const REASON_MAX = 200;
+
+type Rating = "up" | "down";
 
 // The morning brief: one section per crew member. Every line lists the memories it was built from.
 export function BriefingPanel() {
@@ -21,6 +28,12 @@ export function BriefingPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [drafting, setDrafting] = useState<{ idea: string; agent: Role } | null>(null);
+  // Rating state belongs to one brief, so a new brief starts unrated.
+  const [sent, setSent] = useState<{ briefId: string; rating: Rating } | null>(null);
+  const [asking, setAsking] = useState<string | null>(null); // the brief whose "Not useful" reason box is open
+  const [reason, setReason] = useState("");
+  const [sending, setSending] = useState(false);
+  const [rateError, setRateError] = useState<string | null>(null);
 
   if (roomLoading) return <p className="text-sm text-fg-3">Loading…</p>;
   if (!room) return <p className="text-sm text-fg-3">Create a room first.</p>;
@@ -28,6 +41,7 @@ export function BriefingPanel() {
   const run = async () => {
     setBusy(true);
     setMessage(null);
+    setRateError(null);
     try {
       await api.runBrief(room.id);
       brief.reload();
@@ -38,16 +52,26 @@ export function BriefingPanel() {
     }
   };
 
-  const rate = async (b: Brief, rating: "up" | "down") => {
+  const rate = async (b: Brief, value: Rating, why?: string) => {
+    const clean = why?.replace(/[\r\n]+/g, " ").trim().slice(0, REASON_MAX);
+    setSending(true);
+    setRateError(null);
     try {
-      await api.rateBrief(b.id, { rating });
+      await api.rateBrief(b.id, clean ? { rating: value, reason: clean } : { rating: value });
+      setSent({ briefId: b.id, rating: value });
+      setAsking(null);
+      setReason("");
       brief.reload();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not save the rating.");
+      setRateError(e instanceof Error ? e.message : "Could not save the rating.");
+    } finally {
+      setSending(false);
     }
   };
 
   const b = brief.data;
+  const rated: Rating | null = b ? (sent?.briefId === b.id ? sent.rating : b.feedback) : null;
+  const askingReason = !!b && asking === b.id && !rated;
 
   return (
     <div className="space-y-4 text-sm text-fg-2">
@@ -86,13 +110,64 @@ export function BriefingPanel() {
               </ul>
             </section>
           ))}
-          <div className="flex gap-2">
-            <button type="button" className={button} aria-pressed={b.feedback === "up"} onClick={() => rate(b, "up")}>
-              Useful
-            </button>
-            <button type="button" className={button} aria-pressed={b.feedback === "down"} onClick={() => rate(b, "down")}>
-              Not useful
-            </button>
+          <div className="space-y-2" aria-live="polite">
+            {rated ? (
+              <div className="flex gap-2">
+                <button type="button" className={sentButton} aria-pressed="true" disabled>
+                  {rated === "up" ? "Sent: useful" : "Sent: not useful"}
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button type="button" className={button} disabled={sending} onClick={() => void rate(b, "up")}>
+                  Useful
+                </button>
+                <button
+                  type="button"
+                  className={`${button} ${askingReason ? "border-mem" : ""}`}
+                  aria-expanded={askingReason}
+                  aria-controls="brief-reason-form"
+                  disabled={sending}
+                  onClick={() => {
+                    setRateError(null);
+                    setAsking(askingReason ? null : b.id);
+                  }}
+                >
+                  Not useful
+                </button>
+              </div>
+            )}
+            {askingReason && (
+              <form
+                id="brief-reason-form"
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (reason.trim()) void rate(b, "down", reason);
+                }}
+              >
+                <label className="sr-only" htmlFor="brief-reason">
+                  What should change in the brief
+                </label>
+                <input
+                  id="brief-reason"
+                  type="text"
+                  value={reason}
+                  maxLength={REASON_MAX}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="What should change? One sentence."
+                  autoFocus
+                  className="min-w-0 flex-1 rounded-md border border-line bg-deep px-3 py-1 text-fg focus-visible:outline-focus"
+                />
+                <button type="submit" className={button} disabled={sending || !reason.trim()}>
+                  {sending ? "Sending…" : "Send"}
+                </button>
+                <button type="button" className={button} disabled={sending} onClick={() => void rate(b, "down")}>
+                  Skip
+                </button>
+              </form>
+            )}
+            {rateError && <p role="alert" className="text-bad">{rateError}</p>}
           </div>
         </>
       )}

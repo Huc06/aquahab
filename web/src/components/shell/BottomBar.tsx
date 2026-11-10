@@ -40,7 +40,7 @@ export function BottomBar() {
           ● {walrus === "ok" ? "writes ok" : walrus}
         </span>
       </span>
-      <span>Tatum {h?.tatum.ok ? <span className="text-ok">● epoch {h.tatum.epoch}</span> : <span className="text-warn">● off</span>}</span>
+      <span>Tatum {h?.tatum.ok ? <span className="text-ok">● Sui epoch {h.tatum.epoch}</span> : <span className="text-warn">● off</span>}</span>
       <span>Queue {h ? `${h.queue.queued} queued · ${h.queue.pending} pending` : "—"}</span>
       <span>{h?.mode === "mock" ? <span className="text-warn">MOCK: not on Walrus</span> : "Mainnet"}</span>
       <button
