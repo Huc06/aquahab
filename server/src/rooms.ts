@@ -4,7 +4,7 @@
 import { CONTEXT_TAG_MAX, ROLES, type ContextTags, type CreateRoomRequest, type Room, type UpdateRoomRequest } from "./contract.ts";
 import { env } from "./env.ts";
 import { one, q } from "./db.ts";
-import { dayIndex, hmac, isHHMM, localParts, newId, slugify } from "./util.ts";
+import { dayIndex, hmac, isHHMM, isScheduleTime, localParts, newId, slugify } from "./util.ts";
 
 export const CEO_NAMESPACE = "aquahab:ceo";
 export const CEO_SLUG = "ceo";
@@ -91,8 +91,8 @@ export async function createRoom(req: CreateRoomRequest): Promise<Room> {
 export async function updateRoom(id: string, req: UpdateRoomRequest): Promise<Room> {
   const room = await getRoom(id);
   if (!room) throw new RoomError("No such room.");
-  if (req.briefAt && !isHHMM(req.briefAt)) throw new RoomError("briefAt is HH:MM, 24-hour.");
-  if (req.debriefAt && !isHHMM(req.debriefAt)) throw new RoomError("debriefAt is HH:MM, 24-hour.");
+  if (req.briefAt && !isScheduleTime(req.briefAt)) throw new RoomError("briefAt is HH:MM, 24-hour, or off.");
+  if (req.debriefAt && !isScheduleTime(req.debriefAt)) throw new RoomError("debriefAt is HH:MM, 24-hour, or off.");
   await q(`update rooms set name = coalesce($2, name), brief_at = coalesce($3, brief_at), debrief_at = coalesce($4, debrief_at) where id = $1`, [
     room.id,
     req.name?.trim().slice(0, 60) ?? null,

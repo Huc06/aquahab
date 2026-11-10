@@ -199,3 +199,15 @@ Code: `server/scripts/contractor.ts` (PR #29). This is an exception to §11.3, w
 **Why:** Claude Code works on the project outside the server, so routing its notes through the server would put the server in the middle of a Telegram-free workflow. The on-chain key keeps authorship visible.
 
 **How to apply:** a new write path needs its own key on the payroll, its own line in this section, and a CEO hire. Do not let other clients call Walrus without one.
+
+## 15. Feedback is one line, and a persona room can turn its schedule off, v3.4 (2026-11-10)
+
+Code: `server/src/actions.ts` (`isOneLineReason`), `server/src/telegram.ts` (`/times off`), `server/src/scheduler.ts`. Issue #34, items 5, 6 and 8.
+
+1. **A feedback reason is one line,** at most 200 characters. The API refuses anything longer with a 400. In Telegram, when a 👎 is waiting for its reason, a reply to the debrief or a longer note is not filed as feedback. It is read as a note, and the bot says so.
+2. **CEO feedback stays cross-room.** The `aquahab:ceo` namespace holds how the CEO wants to be briefed, so a 👎 on one room's brief shapes every room's next brief. The Keeper's line names the brief the feedback was about.
+3. **A persona room turns its schedule off.** `/times off` (or the *Turn off* button) sets both times to `off`, and the scheduler then sends that room no brief and no debrief. A brief the CEO asks for still runs, and still reads the CEO namespace. `/times 08:30 21:00` turns the schedule back on.
+
+**Why:** a whole debrief filed as feedback was quoted in every later brief. The persona room `creator-demo` was briefed and debriefed twice a day although nobody works in it.
+
+**How to apply:** do not split the CEO namespace per room without a new decision here. A room that should not run on the clock uses `off`, not a far-away time.

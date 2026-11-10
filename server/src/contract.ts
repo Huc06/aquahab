@@ -71,7 +71,7 @@ export interface Room {
   /** `aquahab:room:<slug>`, or an HMAC alias when `private` (namespace names are public on-chain). */
   namespace: string;
   private: boolean;
-  /** Local "HH:MM" in the CEO's timezone. */
+  /** Local "HH:MM" in the CEO's timezone, or "off": the scheduler sends this room nothing. */
   briefAt: string;
   debriefAt: string;
   timezone: string;
@@ -116,6 +116,7 @@ export interface UpdateRoomRequest {
   name?: string;
   /** An empty string clears the goal. */
   goal?: string;
+  /** "HH:MM", or "off" to stop the scheduled brief or debrief. */
   briefAt?: string;
   debriefAt?: string;
   /** Replaces the room's tags; {} clears them. */

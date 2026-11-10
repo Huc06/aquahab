@@ -8,7 +8,7 @@ import { CREW, walruscanBlob, type Brief, type Candidate, type CompareResponse, 
 import { env } from "./env.ts";
 import { getSetting, q, setSetting } from "./db.ts";
 import { subscribe } from "./events.ts";
-import { ActionError, answerDebrief, capture, decide, getCandidate, listCandidates, openDebrief, rateBrief } from "./actions.ts";
+import { ActionError, answerDebrief, capture, decide, getCandidate, isOneLineReason, listCandidates, openDebrief, rateBrief, REASON_MAX } from "./actions.ts";
 import { getBrief, latestBrief, runBrief } from "./brief.ts";
 import { answerFromMemory } from "./llm.ts";
 import { recall } from "./memory/walrus.ts";
@@ -18,7 +18,7 @@ import { createRoom, getRoom, listRooms, RoomError, updateRoom } from "./rooms.t
 import { magicLink } from "./auth.ts";
 import { compare } from "./studio.ts";
 import { crewView } from "./views.ts";
-import { escapeHtml as esc, isHHMM } from "./util.ts";
+import { escapeHtml as esc, isHHMM, SCHEDULE_OFF } from "./util.ts";
 
 type Markup = { inline_keyboard: { text: string; callback_data?: string; url?: string }[][] };
 
@@ -271,15 +271,23 @@ export function parseTimes(text: string): { briefAt?: string; debriefAt?: string
 
 /** Callback data carries times without colons, `tm:0830:2100`, because `:` already separates the fields. */
 const compactTime = (hhmm: string) => hhmm.replace(":", "");
-const expandTime = (s: string | undefined) => (s && s.length === 4 ? `${s.slice(0, 2)}:${s.slice(2)}` : "");
+const expandTime = (s: string | undefined) => (s === SCHEDULE_OFF ? SCHEDULE_OFF : s && s.length === 4 ? `${s.slice(0, 2)}:${s.slice(2)}` : "");
 
 export function timesMarkup(): Markup {
   return {
     inline_keyboard: [
       ...TIME_PRESETS.map(([b, d]) => [{ text: `${b} · ${d}`, callback_data: `tm:${compactTime(b)}:${compactTime(d)}` }]),
       [{ text: "Type my own", callback_data: "m:timesask" }],
+      [{ text: "Turn off (a persona room)", callback_data: `tm:${SCHEDULE_OFF}:${SCHEDULE_OFF}` }],
     ],
   };
+}
+
+/** "Aquahab: brief at 08:30, debrief at 21:00 (Asia/Ho_Chi_Minh)." An "off" time says so, and how to turn it back on. */
+export function scheduleLine(r: Pick<Room, "name" | "briefAt" | "debriefAt" | "timezone">): string {
+  const at = (t: string) => (t === SCHEDULE_OFF ? "off" : `at ${t}`);
+  const off = r.briefAt === SCHEDULE_OFF || r.debriefAt === SCHEDULE_OFF;
+  return `${esc(r.name)}: brief ${at(r.briefAt)}, debrief ${at(r.debriefAt)} (${esc(r.timezone)}).${off ? " <code>/times 08:30 21:00</code> turns the schedule back on." : ""}`;
 }
 
 const timesPrompt = (roomName: string) => `Brief and debrief times for <b>${esc(roomName)}</b>. Pick a pair, or type your own.`;
@@ -542,10 +550,15 @@ async function handleText(chatId: number, messageId: number, text: string, reply
     }
     case "/times": {
       if (!rest.length) return void (await sendTimesPicker(chatId));
+      if (rest[0].toLowerCase() === SCHEDULE_OFF) {
+        const r = await updateRoom(room.id, { briefAt: SCHEDULE_OFF, debriefAt: SCHEDULE_OFF });
+        return void (await send(chatId, scheduleLine(r)));
+      }
       const [briefAt, debriefAt] = rest;
-      if (!briefAt || !isHHMM(briefAt) || (debriefAt && !isHHMM(debriefAt))) return void (await send(chatId, "Use 24-hour times: <code>/times 08:30 21:00</code>"));
+      if (!briefAt || !isHHMM(briefAt) || (debriefAt && !isHHMM(debriefAt)))
+        return void (await send(chatId, "Use 24-hour times: <code>/times 08:30 21:00</code>, or <code>/times off</code> for a persona room."));
       const r = await updateRoom(room.id, { briefAt, debriefAt });
-      return void (await send(chatId, `${esc(r.name)}: brief at ${r.briefAt}, debrief at ${r.debriefAt} (${esc(r.timezone)}).`));
+      return void (await send(chatId, scheduleLine(r)));
     }
     case "/web":
       return void (await sendOfficeLink(chatId));
@@ -570,8 +583,17 @@ async function handleText(chatId: number, messageId: number, text: string, reply
   const awaiting = pending;
   if (awaiting?.kind === "feedback") {
     await setSetting("telegram.await", null);
-    await rateBrief(awaiting.briefId, "down", t, null);
-    return void (await send(chatId, "Noted. The Keeper filed it, and the next brief will follow it."));
+    // A reply to the debrief question, or a long note, is not the one-line reason the 👎 asked for. Filing it as
+    // feedback would make every later brief quote a whole debrief. Read it as a note instead.
+    const toDebrief = replyTo ? (await q(`select 1 from debriefs where telegram_message_id = $1 and status = 'asked'`, [replyTo])).length > 0 : false;
+    if (!toDebrief && isOneLineReason(t)) {
+      await rateBrief(awaiting.briefId, "down", t, null);
+      return void (await send(chatId, "Noted. The Keeper filed it, and the next brief will follow it."));
+    }
+    await send(
+      chatId,
+      `I did not file that as feedback: it is ${toDebrief ? "a reply to the debrief" : `longer than one line of ${REASON_MAX} characters`}. Reading it as a note. Tap 👎 again for a one-line reason.`,
+    );
   }
 
   const debrief = replyTo
@@ -639,10 +661,11 @@ async function handleCallback(chatId: number, messageId: number, data: string, c
     const room = await activeRoom();
     const briefAt = expandTime(a);
     const debriefAt = expandTime(b);
-    if (!room || !isHHMM(briefAt) || !isHHMM(debriefAt)) return void (await ack("Time not valid"));
+    const valid = (t: string) => t === SCHEDULE_OFF || isHHMM(t);
+    if (!room || !valid(briefAt) || !valid(debriefAt)) return void (await ack("Time not valid"));
     const r = await updateRoom(room.id, { briefAt, debriefAt });
     await ack(`Set ${r.briefAt} · ${r.debriefAt}`);
-    return void (await edit(chatId, messageId, `${esc(r.name)}: brief at ${r.briefAt}, debrief at ${r.debriefAt} (${esc(r.timezone)}).`));
+    return void (await edit(chatId, messageId, scheduleLine(r)));
   }
   if (kind === "t") {
     await q(`update candidates set keep = not keep where id = $1 and status = 'proposed'`, [a]);

@@ -6,6 +6,8 @@ import { app } from "../src/app.ts";
 import { ceoLines, tally } from "../src/brief.ts";
 import { cached, closeDb, q } from "../src/db.ts";
 import { processQueue } from "../src/memory/keeper.ts";
+import { tick } from "../src/scheduler.ts";
+import { localParts } from "../src/util.ts";
 import type { Brief, Candidate, MemoriesResponse, MemoryJob, Room } from "../src/contract.ts";
 
 const call = async <T = any>(method: string, path: string, body?: unknown): Promise<{ status: number; json: T }> => {
@@ -111,6 +113,29 @@ describe("the daily loop", () => {
     expect(json.job.namespace).toBe("aquahab:ceo");
     expect(json.job.type).toBe("feedback");
     expect(json.job.agent).toBe("keeper");
+  });
+
+  it("refuses a reason that is not one line, and files nothing", async () => {
+    const { json: b } = await call<Brief>("GET", `/api/rooms/${room.id}/brief/latest`);
+    const before = (await call<MemoryJob[]>("GET", "/api/memory-jobs")).json.length;
+    const pasted = await call("POST", `/api/briefs/${b.id}/feedback`, { rating: "down", reason: "Today we shipped the replay.\nTomorrow we record the video." });
+    const long = await call("POST", `/api/briefs/${b.id}/feedback`, { rating: "down", reason: "x".repeat(201) });
+    expect([pasted.status, long.status]).toEqual([400, 400]);
+    expect((pasted.json as { error: string }).error).toMatch(/one line/);
+    expect((await call<MemoryJob[]>("GET", "/api/memory-jobs")).json.length).toBe(before);
+  });
+
+  it("sends a room whose schedule is off nothing on the clock", async () => {
+    const local = localParts(new Date(), "Asia/Ho_Chi_Minh");
+    const now = `${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`;
+    const { json: persona } = await call<Room>("POST", "/api/rooms", { slug: "persona", name: "Persona", briefAt: now, debriefAt: now });
+    expect((await call("PATCH", `/api/rooms/${persona.id}`, { briefAt: "nine" })).status).toBe(400);
+    const off = await call<Room>("PATCH", `/api/rooms/${persona.id}`, { briefAt: "off", debriefAt: "off" });
+    expect([off.json.briefAt, off.json.debriefAt]).toEqual(["off", "off"]);
+    const out = await tick();
+    expect(out.briefs).not.toContain("persona");
+    expect(out.debriefs).not.toContain("persona");
+    expect(out.errors).toEqual([]);
   });
 
   it("never says the crew read the feedback when no model wrote the brief", async () => {
