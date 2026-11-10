@@ -12,7 +12,7 @@
   <circle cx="1296" cy="242" r="154" fill="url(#vault)"/>
   <path d="M720 240C860 145 945 355 1084 240s214-95 360 0" fill="none" stroke="url(#current)" stroke-linecap="round" stroke-width="8" opacity=".75"/>
   <g fill="#0A1628" stroke="#5EE7F0" stroke-width="3"><circle cx="828" cy="191" r="32"/><circle cx="962" cy="285" r="32"/><circle cx="1093" cy="220" r="32"/><circle cx="1212" cy="272" r="32"/><circle cx="1390" cy="239" r="32"/></g>
-  <g fill="#A8F0F5" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" text-anchor="middle"><text x="828" y="196">ONE</text><text x="962" y="290">RESEARCH</text><text x="1093" y="225">BUILD</text><text x="1212" y="277">GROW</text><text x="1390" y="244">OPS</text></g>
+  <g fill="#A8F0F5" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" text-anchor="middle"><text x="828" y="196">ONE</text><text x="962" y="290">RESEARCH</text><text x="1093" y="225">BUILD</text><text x="1212" y="277">GROW</text><text x="1390" y="244">FINANCE</text></g>
   <g transform="translate(105 120)" fill="none" stroke="#5EE7F0" stroke-linecap="round" filter="url(#glow)"><path d="M6 110C46 36 110 36 150 110s104 74 144 0" stroke-width="20"/><circle cx="6" cy="110" r="14" fill="#5EE7F0" stroke="none"/><circle cx="294" cy="110" r="14" fill="#5EE7F0" stroke="none"/><path d="M57 142c23 31 52 31 75 0s52-31 75 0" stroke-width="10" opacity=".85"/></g>
   <text x="105" y="300" fill="#EAF2F7" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="700" letter-spacing="-4">AQUAHAB</text>
   <text x="111" y="351" fill="#A8F0F5" font-family="Arial, Helvetica, sans-serif" font-size="25" letter-spacing="3">THE CREW THAT REMEMBERS THE WORK</text>

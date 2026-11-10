@@ -32,7 +32,7 @@
 
 ## Judge start here
 
-Aquahab is a **3D office for the projects you cannot afford to re-explain every morning**. A CEO captures a decision, failure, next step, lesson, deadline, or story note. The Walrus Keeper files only approved memories. The crew recalls them when it writes the next brief, and every shown line links back to the Blob IDs it used.
+Aquahab is a **3D office for the projects you cannot afford to re-explain every morning**. A CEO captures a decision, failure, next step, lesson, deadline, or story note. The Walrus Keeper files only approved memories. The crew recalls them when it writes the next brief, and every line built from memory links back to the Blob IDs it used.
 
 **[Open the live office →](https://aquahab.up.railway.app)** · **[Read live health →](https://aquahab.up.railway.app/api/health)** · **[Compare relayer and chain proof →](https://aquahab.up.railway.app/api/proof)** · **[Inspect the Sui-backed crew →](https://aquahab.up.railway.app/api/crew)**
 
@@ -74,7 +74,7 @@ This is not a chat-history archive. Aquahab turns a project event into a **verif
 2. Select a room, then open **Memory Vault**. Each memory has its type, filer, lifecycle status, and Blob receipt.
 3. Open **Briefing**. Every line that relies on memory displays its Blob badge. Open a badge to see the receipt and explorer links.
 4. Open [`/api/proof`](https://aquahab.up.railway.app/api/proof). It compares the live Walrus listing with Sui Blob objects per namespace and delegate key.
-5. Open [`/api/crew`](https://aquahab.up.railway.app/api/crew). It identifies the six labelled delegate keys on the MemWal account through Tatum.
+5. Open [`/api/crew`](https://aquahab.up.railway.app/api/crew). It lists the labelled delegate keys on the MemWal account, read through Tatum, with the transaction that hired each one.
 6. For the full build narrative, live transaction links, and tested limitations, read [`docs/TOTAL_RECALL.md`](docs/TOTAL_RECALL.md).
 
 ## What makes Aquahab different
@@ -138,7 +138,7 @@ A room brief performs three recall passes: recent project context, risks/open wo
 Tatum is used for the chain facts the product displays:
 
 - native Sui gRPC reads the MemWal account, delegate keys, objects, transactions, epoch, and checkpoint;
-- GraphQL indexes the owner's memory Blob objects and reads metadata/events;
+- GraphQL lists the owner's memory Blob objects with their metadata, and the account's hire and fire events from Tatum's indexed checkpoint floor up;
 - the office caches server-side and limits outbound calls to avoid polling Tatum from the browser;
 - a receipt joins the Walrus Blob ID with the Sui object, `memwal_namespace`, `memwal_agent_id`, write transaction, checkpoint, and storage end epoch.
 
@@ -236,7 +236,7 @@ Aquahab/
 
 ## Scope and known limits
 
-Aquahab is a **one-CEO hackathon deployment**. Reads are intentionally public so judges can walk the real office; CEO writes require the Telegram `/web` session. The current product does not claim permanent storage, automatic renewal, arbitrary agent creation, marketplace features, or multi-user production access control.
+Aquahab is a **one-CEO hackathon deployment**. Reads are intentionally public so judges can walk the real office; CEO writes require the Telegram `/web` session. The Telegram bot, [@Aquahab_Crew_bot](https://t.me/Aquahab_Crew_bot), answers only the one CEO chat it is paired with, so judges see it in the demo video and the team can run a live walkthrough on request. The current product does not claim permanent storage, automatic renewal, arbitrary agent creation, marketplace features, or multi-user production access control.
 
 The system handles uncertainty explicitly: a queued memory is not shown as stored, a failed recall is not silently treated as no memory, and a model line without a valid recalled citation is not shown as evidence.
 
