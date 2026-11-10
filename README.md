@@ -101,6 +101,7 @@ Aquahab uses a real MemWal account on Sui mainnet. The account owner remains off
 | Hire Hippo | [2AJMmtbm…](https://suiscan.xyz/mainnet/tx/2AJMmtbmfBybxJtYN2k5ctddcHVN9dV32NnFXxBtHUvE) |
 | Hire Walrus Keeper | [GFkz8jHM…](https://suiscan.xyz/mainnet/tx/GFkz8jHMhERsjAgaoWgCpdmr3UoG4sFA6vL5houFciVW) |
 | File the first project decision | [6cW9GBSW…](https://suiscan.xyz/mainnet/tx/6cW9GBSWJWq1GiN6JU4HqAau5ZPZWx8oAdpx2Ca7AHYg) |
+| Hire Claude Code as a contractor, with its own key | [9QPaPnLE…](https://suiscan.xyz/mainnet/tx/9QPaPnLEGtJN2w21JZ2ygpq74apXB8SvhC1bWtVhCRAz) |
 
 The historical [mainnet probe](docs/FACTS.md) records the account, relayer configuration, native Tatum gRPC, Tatum GraphQL, roster, and delegate-key checks. Live memory totals change as memories are filed, so use [`/api/proof`](https://aquahab.up.railway.app/api/proof) for the current state.
 
