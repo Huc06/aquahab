@@ -1,6 +1,6 @@
 // What Aquahab reads from Sui through Tatum:
 //   - the payroll: the MemWalAccount object's delegate keys (label, public key, hire time)
-//   - the hire/fire history: DelegateKeyAdded / DelegateKeyRemoved events
+//   - the hire/fire history: DelegateKeyAdded / DelegateKeyRemoved events, from Tatum's checkpoint floor up
 //   - every memory's Walrus Blob object: blob id, size, storage.end_epoch, and its memwal_namespace metadata
 //   - the receipt: the transaction and checkpoint that last wrote a Blob
 import { MEMWAL_PACKAGE, WALRUS_BLOB_TYPE } from "../env.ts";
@@ -149,19 +149,40 @@ export interface KeyEvent {
   digest: string | null;
 }
 
+// Tatum's GraphQL index keeps checkpoints from a floor up. An events query with no lower bound reaches below
+// it and fails with "Failed to list events" (OutOfRange: lowest available checkpoint is N). So the query names
+// the floor, and a failure that reports a higher floor is retried once from there.
+let eventFloor = 237_661_232; // Tatum's lowest available checkpoint on 10 Nov 2026
+
+/** The higher floor a Tatum OutOfRange error reports, or null when the error is about something else. */
+export function reportedFloor(message: string, floor: number): number | null {
+  const n = Number(message.match(/lowest available checkpoint is (\d+)/)?.[1]);
+  return Number.isSafeInteger(n) && n > floor ? n : null;
+}
+
 /**
  * Hire and fire history in one GraphQL query: every `account` event the owner signed (events have no gRPC
  * query on Tatum). Event public keys arrive base64; Agent IDs are hex.
  */
 export async function delegateKeyEvents(owner: string, accountId: string): Promise<KeyEvent[]> {
-  const d = await gql<any>(
-    `query($t: String!, $s: SuiAddress!) {
-      events(last: 50, filter: { type: $t, sender: $s }) {
-        nodes { timestamp contents { type { repr } json } transaction { digest } }
-      }
-    }`,
-    { t: `${MEMWAL_PACKAGE}::account`, s: owner },
-  );
+  const list = (after: number) =>
+    gql<any>(
+      `query($t: String!, $s: SuiAddress!) {
+        events(last: 50, filter: { type: $t, sender: $s, afterCheckpoint: ${after} }) {
+          nodes { timestamp contents { type { repr } json } transaction { digest } }
+        }
+      }`,
+      { t: `${MEMWAL_PACKAGE}::account`, s: owner },
+    );
+  let d: any;
+  try {
+    d = await list(eventFloor);
+  } catch (e) {
+    const higher = reportedFloor((e as Error).message, eventFloor);
+    if (higher === null) throw e;
+    eventFloor = higher;
+    d = await list(eventFloor);
+  }
   const out: KeyEvent[] = [];
   for (const n of d.events?.nodes ?? []) {
     const type = String(n.contents?.type?.repr ?? "");

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { formatMemory, guessType, parseCapture, parseMemory, redact } from "../src/memory/format.ts";
 import { blobIdToU256, dayIndex, slugify, u256ToBlobId } from "../src/util.ts";
 import { isDue } from "../src/scheduler.ts";
+import { reportedFloor } from "../src/chain/sui.ts";
 
 describe("memory line format", () => {
   it("round-trips type, room, date, author and supersedes", () => {
@@ -73,6 +74,16 @@ describe("schedule", () => {
   it("counts days from the room's first day", () => {
     expect(dayIndex("2026-11-03", "2026-11-03")).toBe(1);
     expect(dayIndex("2026-11-03", "2026-11-10")).toBe(8);
+  });
+});
+
+describe("Tatum's checkpoint floor", () => {
+  const err = (n: number) =>
+    `tatum graphql: Failed to list events (ListEvents: stream error OutOfRange: requested data below earliest available; lowest available checkpoint is ${n})`;
+  it("moves up to the floor Tatum reports, and only up", () => {
+    expect(reportedFloor(err(250_000_000), 237_661_232)).toBe(250_000_000);
+    expect(reportedFloor(err(237_661_232), 237_661_232)).toBeNull();
+    expect(reportedFloor("tatum graphql: Failed to list events", 237_661_232)).toBeNull();
   });
 });
 

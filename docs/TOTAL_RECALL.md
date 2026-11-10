@@ -33,13 +33,14 @@ Aquahab is an office with a crew of AI agents for each real project. The crew re
 | **3D office** | The crew at their desks, the brief with a Blob badge on every line, the memory wall and its receipts, live events over SSE. | `web/` |
 | **Telegram bot** | Paired to one CEO by code. Commands: <br>- `/brief`, `/debrief`, `/compare`, `/ask`, `/memories`, `/crew`; <br>- quick capture (`d:` decision, `f:` failure, `n:` next, `done:`, `l:` learned, `due:`, `s:` story, `p:` preference); <br>- 👍 / 👎 on every brief. | `server/src/telegram.ts` |
 | **Proof scripts** | `pnpm probe`: read-only mainnet checks, written to `docs/FACTS.md`. `pnpm verify`: every memory on the relayer matched to its Blob object on Sui. It writes `docs/PROOF.md` when run; the file is not committed yet. | `server/scripts/` |
-| **Tests** | 78 server tests against the SDK's `MemWalMock`. They include: <br>- the daily loop end to end; <br>- the LLM path against a fake OpenAI-compatible server that misbehaves on purpose (made-up codes, members out of their domain); <br>- Telegram rendering. | `server/test/` |
+| **Tests** | 81 server tests against the SDK's `MemWalMock`. They include: <br>- the daily loop end to end; <br>- the LLM path against a fake OpenAI-compatible server that misbehaves on purpose (made-up codes, members out of their domain); <br>- Telegram rendering. | `server/test/` |
 
 ## How Tatum is used
 
 | Call | Transport | Used for |
 |---|---|---|
 | `MemWalAccount` object: owner and delegate keys | Tatum native gRPC (`@grpc/grpc-js`) | The crew roster in the office and in `/crew` (`source: "tatum-grpc"`) |
+| Hire and fire history: every `DelegateKeyAdded` and `DelegateKeyRemoved` event the owner signed, with its transaction | Tatum GraphQL (`events`, from Tatum's indexed checkpoint floor up) | `history` and each member's `hireTx` in `GET /api/crew` |
 | Every Walrus Blob the owner holds, with its metadata dynamic field, previous transaction and checkpoint | Tatum GraphQL | The memory wall, each receipt, and `GET /api/proof` (memories on the relayer vs Blob objects on chain) |
 | Account creation and hires | Tatum gRPC, through the Sui SDK's `SuiGrpcClient` | `pnpm account` |
 | Chain, Sui epoch and checkpoint (`GetServiceInfo`) | Tatum native gRPC | `GET /api/health` and the office footer |
@@ -60,7 +61,7 @@ Tatum's free plan allows 3 requests a second (see `server/src/chain/tatum.ts`), 
 | The first memory, a decision filed by One: "Read the crew roster and memory Blobs from Sui through Tatum…" Its Blob [0x3d5f…a12a](https://suiscan.xyz/mainnet/object/0x3d5f8a2498136fa3a0d5b0d6972f50e81d97c67e97dbaddfaab1c5d921d8a12a) carries the namespace `aquahab:room:aquahab` and One's key on chain. Checkpoint 341503306. [Walruscan](https://walruscan.com/mainnet/blob/FxSi7LLYAEQ4-kLZxG7PE37tYq1mGiC1qeZt23PwJS0) | [6cW9GBSW…](https://suiscan.xyz/mainnet/tx/6cW9GBSWJWq1GiN6JU4HqAau5ZPZWx8oAdpx2Ca7AHYg) |
 
 - **Account:** `0x394fc2e4275efeb1b57a94eeff662c68fb2bd16a5d2e908e5fb475c9fd3ef986`.
-- **Known gap:** on 7–8 Nov the live hire history in `/api/crew` came back empty. The cause is not confirmed yet; logging for the failed read is in #30.
+- **Hire history, fixed on 10 Nov:** on 7–9 Nov the hire history in `/api/crew` came back empty. Tatum answered the events query with `Failed to list events`, and the reason underneath was `OutOfRange: lowest available checkpoint is 237661232`: a query with no lower bound reached below Tatum's index. The query now starts at that floor, and moves up if Tatum reports a higher one. The history and each member's `hireTx` come back through Tatum.
 - **Live counts:** [`/api/proof`](https://aquahab.up.railway.app/api/proof) shows memories on the relayer against Blob objects on chain, per namespace and per crew member. [`/api/crew`](https://aquahab.up.railway.app/api/crew) shows the roster read from Sui.
 - **Every memory on chain in the `aquahab` and `creator-journey` rooms is real.** As of 7 Nov that is 9 memories in two rooms. Two of the seven in `aquahab` are setup notes from 4 Nov. The persona room `creator-demo` is separate and labelled as a demo; it is not counted.
 
