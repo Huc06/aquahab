@@ -1,7 +1,8 @@
 // Tatum is how Aquahab reads Sui mainnet. Tatum's Sui JSON-RPC is gone (the gateway serves GraphQL and
 // gRPC only), and @mysten/sui's SuiGrpcClient speaks gRPC-web, which Tatum's gateway does not accept.
 // So: native gRPC (sui.rpc.v2) through @grpc/grpc-js for objects and transactions, and GraphQL for
-// events, which have no gRPC query. Server-only; the key travels as `x-api-key`.
+// events, which have no gRPC query. Tatum's GraphQL index starts at a checkpoint floor, so a list query must
+// name a lower bound (see delegateKeyEvents in sui.ts). Server-only; the key travels as `x-api-key`.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../env.ts";
@@ -53,7 +54,11 @@ export async function gql<T = any>(query: string, variables: Record<string, unkn
     } catch {
       throw new Error(`tatum graphql ${r.status}: ${text.slice(0, 200)}`);
     }
-    if (j.errors?.length) throw new Error(`tatum graphql: ${j.errors[0].message}`);
+    if (j.errors?.length) {
+      // Keep Tatum's own reason (extensions.chain): "Failed to list events" alone hides why.
+      const why = [j.errors[0].extensions?.chain ?? []].flat().join("; ");
+      throw new Error(`tatum graphql: ${j.errors[0].message}${why ? ` (${why})` : ""}`);
+    }
     return j.data as T;
   }
   throw new Error("tatum graphql: rate limited");
