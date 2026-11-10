@@ -11,13 +11,13 @@ type Message = { id: number; from: "ceo" | "crew"; text: string };
 
 const HINT = "Capture with d: decision, f: failure, n: next, done:, l: learned, due: deadline, s: story, p: preference.";
 
-// CEO console: quick capture into the active room. Each line becomes a memory after the crew files it.
+// CEO console. Ask the Crew (the default) stores nothing; Quick Capture files every line as a memory in the active room.
 export function ChatPanel() {
   const open = useHQ((s) => s.chatOpen);
   const setOpen = useHQ((s) => s.setChatOpen);
-  const { room } = useActiveRoom();
+  const { room, loading: roomLoading } = useActiveRoom();
   const [draft, setDraft] = useState("");
-  const [mode, setMode] = useState<"capture" | "ask">("capture");
+  const [mode, setMode] = useState<"capture" | "ask">("ask");
   const [messages, setMessages] = useState<Message[]>([{ id: 0, from: "crew", text: HINT }]);
   const nextId = useRef(1);
   const cancels = useRef<(() => void)[]>([]);
@@ -73,7 +73,7 @@ export function ChatPanel() {
           className="pointer-events-auto absolute bottom-24 right-3 z-30 flex h-[420px] w-[420px] flex-col rounded-md border border-line bg-surface/95"
         >
           <header className="flex items-center justify-between border-b border-line-decor px-4 py-3">
-            <h2 className="text-base font-semibold text-fg">{room ? `Capture · ${room.name}` : "Capture"}</h2>
+            <h2 className="text-base font-semibold text-fg">{room ? `Chat · ${room.name}` : "Chat"}</h2>
             <button
               type="button"
               aria-label="Close chat"
@@ -85,7 +85,7 @@ export function ChatPanel() {
           </header>
 
           <div role="tablist" aria-label="Chat mode" className="flex gap-1.5 border-b border-line-decor px-3 py-2 text-sm">
-            {(["capture", "ask"] as const).map((m) => (
+            {(["ask", "capture"] as const).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -99,10 +99,17 @@ export function ChatPanel() {
             ))}
           </div>
 
-          {mode === "ask" && room ? (
-            <AskTheCrew roomId={room.id} roomName={room.name} />
+          {mode === "ask" ? (
+            room ? (
+              <AskTheCrew roomId={room.id} roomName={room.name} />
+            ) : (
+              <p className="p-3 text-sm text-fg-3">{roomLoading ? "Loading…" : "Create a room in Rooms first."}</p>
+            )
           ) : (
           <>
+          <p id="capture-hint" className="border-b border-line-decor px-3 py-2 text-[13px] text-fg-2">
+            Everything you send here is filed as a memory{room ? ` in ${room.name}` : ""}. To ask a question, use Ask the Crew.
+          </p>
           <ol className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 text-sm" aria-live="polite">
             {messages.map((m) => (
               <li key={m.id} className={m.from === "ceo" ? "ml-10 rounded-md bg-raised px-3 py-2 text-fg" : "mr-10 px-3 py-2 text-fg-2"}>
@@ -119,10 +126,11 @@ export function ChatPanel() {
             }}
           >
             <label className="sr-only" htmlFor="chat-input">
-              Capture a note
+              File a memory
             </label>
             <input
               id="chat-input"
+              aria-describedby="capture-hint"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="d: Use Tatum GraphQL for events"

@@ -89,7 +89,7 @@ function ReceiptRows({ receipt }: { receipt: MemoryReceipt }) {
         {receipt.blobObjectId && <Row label="Sui object" value={receipt.blobObjectId} mono />}
         {receipt.namespaceOnChain && <Row label="Namespace" value={receipt.namespaceOnChain} mono />}
         {receipt.storedAt && <Row label="Stored" value={new Date(receipt.storedAt).toLocaleString()} />}
-        {receipt.endEpoch !== null && <Row label="Ends at epoch" value={String(receipt.endEpoch)} mono />}
+        {receipt.endEpoch !== null && <Row label="Walrus storage ends at epoch" value={String(receipt.endEpoch)} mono />}
         {receipt.size !== null && <Row label="Size" value={`${receipt.size} bytes`} mono />}
         {receipt.checkpoint && <Row label="Checkpoint" value={receipt.checkpoint} mono />}
       </dl>

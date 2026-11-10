@@ -94,20 +94,43 @@ export const api = {
   proof: () => call<ProofResponse>("GET", "/proof"),
 };
 
+const EVENT_TYPES: AquahabEvent["type"][] = ["memory.queued", "memory.stored", "memory.failed", "recall.used", "brief.created", "standup.created", "crew.changed"];
+
+// One EventSource for the whole page, shared by every subscriber. It opens with the first and closes with the last.
+const subscribers = new Set<(e: AquahabEvent) => void>();
+let source: EventSource | null = null;
+
 /**
  * Live cues for the 3D office: `memory.stored` (an object appears), `recall.used` (cited objects glow),
  * `brief.created`, `standup.created`, `crew.changed`. EventSource reconnects on its own and resumes from the last event id.
  */
 export function onEvents(handler: (e: AquahabEvent) => void): () => void {
-  const es = new EventSource("/api/events");
-  const types: AquahabEvent["type"][] = ["memory.queued", "memory.stored", "memory.failed", "recall.used", "brief.created", "standup.created", "crew.changed"];
-  const listener = (m: MessageEvent<string>) => {
-    try {
-      handler(JSON.parse(m.data) as AquahabEvent);
-    } catch {
-      // ignore a malformed frame
-    }
+  // A wrapper per call, so subscribing the same function twice gives two independent subscriptions.
+  const sub = (e: AquahabEvent) => handler(e);
+  subscribers.add(sub);
+  if (!source) {
+    const es = new EventSource("/api/events");
+    const listener = (m: MessageEvent<string>) => {
+      let event: AquahabEvent;
+      try {
+        event = JSON.parse(m.data) as AquahabEvent;
+      } catch {
+        return; // ignore a malformed frame
+      }
+      for (const s of [...subscribers]) {
+        try {
+          s(event);
+        } catch {
+          // one subscriber failing must not stop the others
+        }
+      }
+    };
+    for (const t of EVENT_TYPES) es.addEventListener(t, listener as EventListener);
+    source = es;
+  }
+  return () => {
+    if (!subscribers.delete(sub) || subscribers.size > 0) return;
+    source?.close();
+    source = null;
   };
-  for (const t of types) es.addEventListener(t, listener as EventListener);
-  return () => es.close();
 }
