@@ -12,236 +12,170 @@
   <a href=".github/workflows/ci.yml"><img src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
 </p>
 
-```text
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  AQUAHAB · THE CREW THAT REMEMBERS                                            │
-│                                                                              │
-│  A real project ──► a room ──► approved memory ──► next brief                │
-│                                                                              │
-│  One              Researcher          Builder          Lofi        Hippo     │
-│  Chief of Staff   Head of Research    Engineering      Growth      Finance   │
-│       ╲                 │                  │              │            ╱     │
-│        ╲________________│__________________│______________│___________╱      │
-│                                 WALRUS KEEPER                                │
-│                                                                              │
-│  Each stored memory has a Walrus Blob ID. Each brief line cites the blobs    │
-│  it used. Tatum reads the corresponding Sui objects, author keys, writes,   │
-│  and checkpoints for the office.                                             │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+<h3 align="center">An AI crew for each real project. It keeps the project's memory on Walrus,<br />and every line it writes links to the memory it came from.</h3>
 
-## Judge start here
+<p align="center"><b><a href="https://aquahab.up.railway.app">Open the live office →</a></b></p>
 
-Aquahab is a **3D office for the projects you cannot afford to re-explain every morning**. A CEO captures a decision, failure, next step, lesson, deadline, or story note. The Walrus Keeper files only approved memories. The crew recalls them when it writes the next brief, and every line built from memory links back to the Blob IDs it used.
+<p align="center">
+  <a href="https://aquahab.up.railway.app"><img src="docs/images/office.jpg" alt="The live Aquahab office: the crew at their desks around the Walrus vault, with the Walrus, Tatum and queue status in the footer" width="100%" /></a>
+</p>
 
-**[Open the live office →](https://aquahab.up.railway.app)** · **[Read live health →](https://aquahab.up.railway.app/api/health)** · **[Compare relayer and chain proof →](https://aquahab.up.railway.app/api/proof)** · **[Inspect the Sui-backed crew →](https://aquahab.up.railway.app/api/crew)**
+## In 30 seconds
 
-| What to verify | Live evidence | What it proves |
+A CEO runs each project with a crew of AI agents: **One** (Chief of Staff), **Researcher**, **Builder**, **Lofi** (Growth), **Hippo** (Finance) and the **Walrus Keeper**. Every morning the crew writes a brief. Every evening it asks how the day went. What the CEO keeps is stored as a Walrus memory, and the next brief is written from those memories.
+
+- **Memory changes the next output.** Every brief line cites the Walrus Blob it rests on. A line that cites nothing real is dropped before anyone sees it.
+- **Every memory has a receipt on Sui.** Click any Blob badge to see its Sui object, namespace, author key, checkpoint and storage end epoch, read through Tatum.
+- **Every agent is an on-chain identity.** Each crew member signs with its own delegate key on one MemWal account. The roster and its hire history come from Sui, not from our database.
+- **Feedback is memory too.** A 👎 with a one-line reason becomes a memory. Later briefs follow it and say so, with its receipt.
+- **In daily use on mainnet since 4 Nov.** As of 11 Nov there are 20 memories in 4 namespaces, each matched to its Blob on Sui. There are 7 hires on chain, one of them Claude Code as a contractor with its own key.
+
+## See it
+
+| Every memory has a receipt | Every brief line cites its memory |
+|:---:|:---:|
+| <img src="docs/images/receipt.jpg" alt="Memory Vault with a receipt open: Blob ID, Sui object, namespace, stored time, Walrus storage end epoch, size, checkpoint, explorer links" width="360" /> | <img src="docs/images/brief.jpg" alt="Morning brief: each line ends with a Blob badge, and the Walrus Keeper names the CEO's earlier feedback with its Blob" width="360" /> |
+| A memory signed by the Claude Code contractor's own key. The receipt is read from Sui through Tatum. | Each line carries the Blob it came from. The Keeper's last line is the CEO's 👎 from another day, with its receipt. |
+
+## Verify it in two minutes
+
+| Check | Open | What you should see |
 |---|---|---|
-| **Live product** | [Aquahab office](https://aquahab.up.railway.app) | A public, interactive 3D office with rooms, crew, Memory Vault, briefs, receipts, and Telegram-backed CEO writes. |
-| **Walrus mainnet writes** | [`GET /api/health`](https://aquahab.up.railway.app/api/health) | The live service reports mainnet mode, relayer health, queue state, LLM health, and Tatum chain health. |
-| **Relayer ↔ Sui match** | [`GET /api/proof`](https://aquahab.up.railway.app/api/proof) | Live totals, namespace counts, and memories-per-filer. The endpoint compares Walrus-relayer memory listings against Sui Blob objects. |
-| **Crew identity** | [`GET /api/crew`](https://aquahab.up.railway.app/api/crew) | The office roster comes from the MemWal account through Tatum Sui gRPC, not a frontend fixture. |
-| **One Blob on chain** | [First decision object on Suiscan](https://suiscan.xyz/mainnet/object/0x3d5f8a2498136fa3a0d5b0d6972f50e81d97c67e97dbaddfaab1c5d921d8a12a) · [Walruscan](https://walruscan.com/mainnet/blob/FxSi7LLYAEQ4-kLZxG7PE37tYq1mGiC1qeZt23PwJS0) | The Blob metadata records the room namespace and the delegate key that filed it. |
-| **Complete criterion map** | [Total Recall entry](docs/TOTAL_RECALL.md) | Source paths, live transactions, known gaps, and each judging criterion mapped to evidence. |
+| **The product** | [Live office](https://aquahab.up.railway.app) | Pick a room. Open **VAULT** for memories and receipts, open **BRIEFING** for cited lines, then click any **Blob** badge. Reads are public; writes need the CEO's Telegram session. |
+| **Memory matches the chain** | [`/api/proof`](https://aquahab.up.railway.app/api/proof) | `memories` equals `onChain`, per namespace and per crew member. |
+| **The crew comes from Sui** | [`/api/crew`](https://aquahab.up.railway.app/api/crew) | `source: "tatum-grpc"`. `history` lists every hire with its transaction, read through Tatum GraphQL. |
+| **The service is live** | [`/api/health`](https://aquahab.up.railway.app/api/health) | Mainnet mode, relayer writes `ok`, and Tatum's Sui epoch and checkpoint. |
+| **One Blob on chain** | [Suiscan](https://suiscan.xyz/mainnet/object/0x3d5f8a2498136fa3a0d5b0d6972f50e81d97c67e97dbaddfaab1c5d921d8a12a) · [Walruscan](https://walruscan.com/mainnet/blob/FxSi7LLYAEQ4-kLZxG7PE37tYq1mGiC1qeZt23PwJS0) | The first memory. Its metadata records the room namespace and the key of the agent that filed it. |
+| **Every criterion** | [`docs/TOTAL_RECALL.md`](docs/TOTAL_RECALL.md) | Each judging criterion mapped to code and live evidence. |
 
-## The learning loop
+## How it works
 
 ```text
-CEO captures a real project event
-  “d: Lead the launch demo with creator context.”
-                │
-                ▼
-Walrus Keeper redacts → types → queues → paces → signs → stores
-                │                                  │
-                │                         Walrus Blob ID
-                ▼                                  │
-Next morning, the crew recalls project context ◄───┘
-                │
-                ▼
-Brief lines cite the memories they used
-                │
-                ▼
-CEO can inspect the Blob receipt: Sui object, author key, transaction,
-checkpoint, namespace, and storage end epoch.
+CEO, in Telegram or the office:  "d: Lead the launch demo with creator context."
+        │
+        ▼
+Walrus Keeper   redact → type → queue → pace → sign with the filer's key → store
+        │                                                          │
+        │                                                  Walrus Blob ID
+        ▼                                                          │
+Next morning    the crew recalls the room's memories ◄─────────────┘
+        │
+        ▼
+Brief           every line cites its Blob · uncited lines are dropped
+        │
+        ▼
+Receipt         Sui object · namespace · author key · checkpoint, read through Tatum
+        │
+        ▼
+CEO             keeps or drops tonight's debrief items, rates the brief → new memories
 ```
 
-This is not a chat-history archive. Aquahab turns a project event into a **verifiable input to a later decision**.
+This is not a chat archive. Each project event becomes a **verifiable input to a later decision**.
 
-### A five-minute judge walkthrough
+## How Aquahab uses Walrus and Tatum
 
-1. Open the [live office](https://aquahab.up.railway.app). Reads are public so judges can inspect the product without a CEO session.
-2. Select a room, then open **Memory Vault**. Each memory has its type, filer, lifecycle status, and Blob receipt.
-3. Open **Briefing**. Every line that relies on memory displays its Blob badge. Open a badge to see the receipt and explorer links.
-4. Open [`/api/proof`](https://aquahab.up.railway.app/api/proof). It compares the live Walrus listing with Sui Blob objects per namespace and delegate key.
-5. Open [`/api/crew`](https://aquahab.up.railway.app/api/crew). It lists the labelled delegate keys on the MemWal account, read through Tatum, with the transaction that hired each one.
-6. For the full build narrative, live transaction links, and tested limitations, read [`docs/TOTAL_RECALL.md`](docs/TOTAL_RECALL.md).
+**Walrus Memory is the product, not a log.**
 
-## What makes Aquahab different
+- **One room is one project and one namespace** (`aquahab:room:<slug>`). The CEO's preferences and feedback live in `aquahab:ceo`, which every room reads. Private rooms use an HMAC alias, because namespaces are public metadata.
+- **One write path.** On the server, the Keeper is the only code that writes. There is no `autoSave` and no `analyze()`: nothing is stored without the CEO. The one exception is the Claude Code contractor, which writes with its own hired key ([DECISIONS §14](docs/product/DECISIONS.md)).
+- **Recall before every answer.** A brief recalls three times: recent work, risks, and the CEO's preferences. The standup, drafts and `/ask` recall first too. `/compare` answers the same question twice: once with no memory, then from the room's memory with receipts.
 
-| Pillar | What we built |
+**Tatum carries every chain read the office shows.**
+
+| Read | Tatum transport | Shown as |
+|---|---|---|
+| MemWal account and its delegate keys | Native gRPC | The crew roster |
+| Hire and fire events, from Tatum's indexed checkpoint floor up | GraphQL | `history` and each member's `hireTx` |
+| Blob objects with their metadata, write transaction and checkpoint | GraphQL | The Vault, every receipt, `/api/proof` |
+| Sui epoch and checkpoint | Native gRPC | `/api/health` and the office footer |
+| Account creation and hires | gRPC, through the Sui SDK | `pnpm account` |
+
+The server caches and paces Tatum to about 2 requests a second. The browser never calls Tatum directly.
+
+## Built under real constraints
+
+| Constraint | What Aquahab does |
 |---|---|
-| **Rooms are project memory** | One room equals one real project and one Walrus Memory namespace. Private rooms use an HMAC alias because namespaces are public metadata. |
-| **The crew is on payroll** | One, Researcher, Builder, Lofi, Hippo, and the Walrus Keeper each have a labelled Ed25519 delegate key. The Blob records who filed a memory on chain. |
-| **Memory is used, not merely saved** | Morning briefs, evening debriefs, crew standups, drafts, and `/compare` recall room context before responding. Brief and standup lines without valid memory citations are dropped. |
-| **Evidence follows the output** | Receipts expose the Blob object, namespace, author, write transaction, checkpoint, and explorer links. The office reads these facts through Tatum. |
-| **The human stays in control** | The CEO approves captures, debrief candidates, and feedback. There is no `autoSave` path and no unreviewed `analyze()` call. |
+| A relayer recall can come back empty when decryption fails | Retry once, then cross-check the Keeper's ledger. A fallback brief is marked `degraded`. |
+| `remember()` is asynchronous | Queue and poll it. The office gets `memory.queued`, `memory.stored` and `memory.failed` as SSE events. |
+| Relayer limits are shared across delegate keys | Pace writes per account and per key, honour 429/503 retry windows, and reuse the same idempotency key. |
+| Tatum's GraphQL index starts at a checkpoint floor | Query events from the floor, raise it if Tatum reports a higher one, and keep Tatum's reason in our errors. |
+| Sui stores Blob IDs differently from the relayer | Convert base64url Blob IDs to Sui's little-endian u256, and normalise public-key encodings. |
+| The default Sui gRPC-web transport cannot reach Tatum | Use native HTTP/2 gRPC for Tatum, and GraphQL for index and event queries. |
+| The SDK cannot forget one memory safely | Supersede it with a later memory that names the older Blob. History is never silently erased. |
+
+More in [`docs/FRICTION.md`](docs/FRICTION.md).
 
 ## Mainnet evidence
 
-Aquahab uses a real MemWal account on Sui mainnet. The account owner remains offline; the deployed service holds only scoped delegate keys.
+The MemWal account's owner key stays offline. The deployed server holds only the crew's scoped delegate keys.
 
-| On-chain action | Evidence |
+| On-chain action | Transaction |
 |---|---|
-| Create Aquahab MemWal account | [2EG1WAjX…](https://suiscan.xyz/mainnet/tx/2EG1WAjXKNSDUthezKmg3bBZA58dmeQKPhZ6yhB6SnYC) |
-| Hire One | [DtqqN9od…](https://suiscan.xyz/mainnet/tx/DtqqN9odCsTtVTiTowzpnTakhWnL2QoVW2cmAxwFEPbf) |
-| Hire Researcher | [2vbfTv27…](https://suiscan.xyz/mainnet/tx/2vbfTv27ZVmLseGT6CgsZbZRTjQNZreqxeqpT3y2q4qX) |
-| Hire Builder | [9Z7cRKwX…](https://suiscan.xyz/mainnet/tx/9Z7cRKwXpxkWsEks3C4jR9RKiq1PZxrWn4QmBLWhtQ3r) |
-| Hire Lofi | [ASoYahPw…](https://suiscan.xyz/mainnet/tx/ASoYahPwdaQtqscGNbCh6xhiCGaHDmVQeURbvjgxFLoS) |
-| Hire Hippo | [2AJMmtbm…](https://suiscan.xyz/mainnet/tx/2AJMmtbmfBybxJtYN2k5ctddcHVN9dV32NnFXxBtHUvE) |
-| Hire Walrus Keeper | [GFkz8jHM…](https://suiscan.xyz/mainnet/tx/GFkz8jHMhERsjAgaoWgCpdmr3UoG4sFA6vL5houFciVW) |
+| Create the Aquahab MemWal account | [2EG1WAjX…](https://suiscan.xyz/mainnet/tx/2EG1WAjXKNSDUthezKmg3bBZA58dmeQKPhZ6yhB6SnYC) |
+| Hire One · Researcher · Builder | [DtqqN9od…](https://suiscan.xyz/mainnet/tx/DtqqN9odCsTtVTiTowzpnTakhWnL2QoVW2cmAxwFEPbf) · [2vbfTv27…](https://suiscan.xyz/mainnet/tx/2vbfTv27ZVmLseGT6CgsZbZRTjQNZreqxeqpT3y2q4qX) · [9Z7cRKwX…](https://suiscan.xyz/mainnet/tx/9Z7cRKwXpxkWsEks3C4jR9RKiq1PZxrWn4QmBLWhtQ3r) |
+| Hire Lofi · Hippo · Walrus Keeper | [ASoYahPw…](https://suiscan.xyz/mainnet/tx/ASoYahPwdaQtqscGNbCh6xhiCGaHDmVQeURbvjgxFLoS) · [2AJMmtbm…](https://suiscan.xyz/mainnet/tx/2AJMmtbmfBybxJtYN2k5ctddcHVN9dV32NnFXxBtHUvE) · [GFkz8jHM…](https://suiscan.xyz/mainnet/tx/GFkz8jHMhERsjAgaoWgCpdmr3UoG4sFA6vL5houFciVW) |
 | File the first project decision | [6cW9GBSW…](https://suiscan.xyz/mainnet/tx/6cW9GBSWJWq1GiN6JU4HqAau5ZPZWx8oAdpx2Ca7AHYg) |
 | Hire Claude Code as a contractor, with its own key | [9QPaPnLE…](https://suiscan.xyz/mainnet/tx/9QPaPnLEGtJN2w21JZ2ygpq74apXB8SvhC1bWtVhCRAz) |
 
-The historical [mainnet probe](docs/FACTS.md) records the account, relayer configuration, native Tatum gRPC, Tatum GraphQL, roster, and delegate-key checks. Live memory totals change as memories are filed, so use [`/api/proof`](https://aquahab.up.railway.app/api/proof) for the current state.
+The [mainnet probe](docs/FACTS.md) records the account, relayer configuration, Tatum gRPC and GraphQL, and the delegate-key checks. For live totals, use [`/api/proof`](https://aquahab.up.railway.app/api/proof).
 
 ## Architecture
 
 ```text
 ┌────────────────────── CEO interfaces ──────────────────────┐
 │  Telegram bot                         3D web office         │
-│  room · capture · brief · debrief     rooms · Vault · proof │
+│  capture · brief · debrief · 👍/👎    rooms · Vault · proof │
 └───────────────┬─────────────────────────────────┬───────────┘
-                │                                 │
                 └──────────────┬──────────────────┘
                                ▼
 ┌──────────────── Aquahab crew server · Hono ────────────────┐
 │  CEO session · rooms · Keeper queue · scheduler · SSE        │
-│  brief / debrief / studio · deterministic LLM fallbacks      │
-│  Postgres production ledger · PGlite local development       │
+│  brief · debrief · standup · studio · LLM fallbacks          │
+│  Postgres ledger in production · PGlite for local dev        │
 └────────────────┬─────────────────────────────┬─────────────┘
-                 │                             │
                  ▼                             ▼
       Walrus Memory relayer              Tatum Sui gateway
       remember · recall · list           native gRPC · GraphQL
-                 │                             │
                  └─────────────► Sui mainnet ◄─┘
 ```
 
-### Walrus Memory
-
-The Keeper is the only write path. It redacts credential-shaped text, formats typed memory, creates an account-wide idempotency key, queues the request in the ledger, paces submissions, retries failures, waits for a Blob ID, and emits an SSE update only after storage confirms.
-
-A room brief performs three recall passes: recent project context, risks/open work, and the CEO's cross-room preferences. The model can only cite recalled codes. Aquahab rejects invented citations and uses a deterministic fallback if an LLM response fails.
-
-### Tatum and Sui
-
-Tatum is used for the chain facts the product displays:
-
-- native Sui gRPC reads the MemWal account, delegate keys, objects, transactions, epoch, and checkpoint;
-- GraphQL lists the owner's memory Blob objects with their metadata, and the account's hire and fire events from Tatum's indexed checkpoint floor up;
-- the office caches server-side and limits outbound calls to avoid polling Tatum from the browser;
-- a receipt joins the Walrus Blob ID with the Sui object, `memwal_namespace`, `memwal_agent_id`, write transaction, checkpoint, and storage end epoch.
-
-## Engineering decisions under real constraints
-
-| Constraint | Aquahab response |
-|---|---|
-| A relayer may return an empty recall response when decryption fails | Retry once, then cross-check the Keeper ledger. A fallback brief is explicitly marked `degraded`. |
-| A `remember()` response is asynchronous | Queue and poll it. The web app receives `memory.queued`, `memory.stored`, and `memory.failed` as durable SSE events. |
-| Relayer limits are shared across delegate keys | Pace both account-wide and per-key writes. Honour 429/503 retry windows and reuse the same idempotency key. |
-| Sui representations differ from relayer identifiers | Convert base64url Blob IDs to the little-endian u256 representation stored on Sui, and normalize public-key encodings. |
-| The default Sui gRPC-web transport cannot reach Tatum's gateway | Use native HTTP/2 transport for Tatum gRPC and GraphQL for index/event queries. |
-| The SDK cannot forget one TypeScript memory safely | Supersede with a later memory that names the older Blob; never silently erase history. |
-
-See [`docs/FRICTION.md`](docs/FRICTION.md) for the full implementation notes and source issue references.
-
 ## Run it locally
 
-### 1. Safe UI and API walkthrough, no keys and no chain writes
+No keys and no chain writes: mock mode runs the real API, queue, briefs, debriefs and UI over the SDK's in-memory MemWal mock.
 
 ```bash
-cd server
-pnpm install
-pnpm dev:mock
+cd server && pnpm install && pnpm dev:mock     # API on :8787
+cd web && pnpm install && pnpm dev             # office on http://localhost:3000
 ```
 
-In another terminal:
+Checks, the same as CI: `pnpm check` in `server/` (typecheck and 84 tests: the daily loop, redaction, idempotency, citation checks, debrief approval, Telegram flows, SSE and LLM fallbacks) and in `web/` (TypeScript, ESLint and a production build).
 
-```bash
-cd web
-pnpm install
-pnpm dev
-```
+Mainnet needs an operator-owned MemWal account, the crew's delegate keys, a Tatum API key, an LLM provider, Telegram and Postgres. See [`server/README.md`](server/README.md) and [`docs/DEPLOY.md`](docs/DEPLOY.md). Secrets stay on the server.
 
-Open <http://localhost:3000>. Mock mode runs the real API, queue, briefing, debrief, and UI over the SDK's in-memory MemWal mock. It does not reach Walrus, Sui, Tatum, an LLM provider, or Telegram.
+## Where to look in the code
 
-### 2. Run checks
-
-```bash
-cd server
-pnpm check
-
-cd ../web
-pnpm check
-```
-
-Server tests cover the daily loop, redaction, idempotency, citation validation, debrief approval, studio, standup, SSE, Telegram flows, database copying, and LLM fallback behavior. Web checks run TypeScript, ESLint, and a Next.js production build.
-
-### 3. Mainnet setup
-
-Mainnet requires an operator-owned MemWal account, six delegate keys, a Tatum API key, an LLM provider, Telegram configuration, and a production Postgres database. Secrets are server-only. Follow [`server/README.md`](server/README.md) and [`docs/DEPLOY.md`](docs/DEPLOY.md); do not copy local secrets into issue threads, the browser, or the repository.
-
-## Where to inspect the build
+| To verify… | Start here | Then |
+|---|---|---|
+| **A memory reaches Walrus** | [`server/src/memory/keeper.ts`](server/src/memory/keeper.ts) | [`/api/memory-jobs`](https://aquahab.up.railway.app/api/memory-jobs) → a receipt → Walruscan |
+| **Memory changes a later output** | [`server/src/brief.ts`](server/src/brief.ts) | [`BriefingPanel.tsx`](web/src/components/briefing/BriefingPanel.tsx) → the Blob badges |
+| **A crew member is an on-chain identity** | [`server/src/chain/sui.ts`](server/src/chain/sui.ts) | [`server/src/views.ts`](server/src/views.ts) → [`/api/crew`](https://aquahab.up.railway.app/api/crew) |
+| **Feedback becomes memory** | [`server/src/actions.ts`](server/src/actions.ts) | the Keeper's line in the next brief |
+| **The Telegram bot is locked to one CEO** | [`server/src/telegram.ts`](server/src/telegram.ts) | pairing, receipts, capture and the `/web` magic link |
+| **The system survives real failures** | [`docs/FRICTION.md`](docs/FRICTION.md) | backoff, retry, timeouts, the `degraded` brief |
 
 ```text
-Aquahab/
-│
-├── web/                                  The judge-facing 3D office
-│   ├── src/app/page.tsx                   Full-screen HQ entry point
-│   ├── src/components/hq/                 Office model, roaming crew, scene labels
-│   ├── src/components/memory/             Vault and Blob receipt UI
-│   ├── src/components/briefing/           Cited morning brief UI
-│   └── src/components/chat/               CEO capture and crew conversation UI
-│
-├── server/                               The product and memory runtime
-│   ├── src/app.ts                         Hono API, CEO-write boundary, SSE, Telegram webhook
-│   ├── src/memory/keeper.ts               Redaction → queue → pacing → signed Walrus write → Blob ID
-│   ├── src/memory/walrus.ts               Walrus Memory client, recall, and local mock adapter
-│   ├── src/brief.ts                       Three-pass recall and citation-checked morning brief
-│   ├── src/actions.ts                     Capture, debrief candidates, CEO keep/drop decisions
-│   ├── src/standup.ts                     Crew conversation built from cited memories
-│   ├── src/studio.ts                      Draft and without-memory / with-memory comparison
-│   ├── src/telegram.ts                    Pairing, CEO bot controls, receipts, and magic web link
-│   ├── src/views.ts                       Relayer × Sui read models for Vault, crew, and proof
-│   ├── src/chain/sui.ts                   Tatum gRPC / GraphQL chain reads and Blob metadata
-│   └── test/                              Daily loop, queue, citations, Telegram, SSE, and fallback tests
-│
-├── docs/                                 Judge evidence and operating record
-│   ├── TOTAL_RECALL.md                    Track criterion map, live mainnet transactions, known gaps
-│   ├── FACTS.md                           Read-only mainnet probe transcript
-│   ├── FRICTION.md                        Integration failures and production mitigations
-│   └── DEPLOY.md                          Railway topology, secrets boundary, and smoke test
-│
-└── .github/workflows/ci.yml               Contract sync plus separate web and server checks
+web/       Next.js + React Three Fiber office: hq/ (3D scene), memory/ (Vault), briefing/, receipt/, chat/
+server/    Hono API, Keeper, scheduler, Telegram, chain reads (src/chain/), tests (test/)
+docs/      TOTAL_RECALL.md (criteria), FACTS.md (mainnet probe), FRICTION.md, DEPLOY.md, product/DECISIONS.md
 ```
-
-| If you want to verify… | Start here | Follow it to |
-|---|---|---|
-| **A memory really reaches Walrus** | [`server/src/memory/keeper.ts`](server/src/memory/keeper.ts) | [`/api/memory-jobs`](https://aquahab.up.railway.app/api/memory-jobs) → Blob receipt → [Walruscan](https://walruscan.com/mainnet/blob/FxSi7LLYAEQ4-kLZxG7PE37tYq1mGiC1qeZt23PwJS0) |
-| **Memory changes a later output** | [`server/src/brief.ts`](server/src/brief.ts) | [`web/src/components/briefing/BriefingPanel.tsx`](web/src/components/briefing/BriefingPanel.tsx) → cited Blob badges |
-| **A crew member is a real on-chain identity** | [`server/src/chain/sui.ts`](server/src/chain/sui.ts) | [`server/src/views.ts`](server/src/views.ts) → [`/api/crew`](https://aquahab.up.railway.app/api/crew) |
-| **The office matches live data** | [`web/src/components/hq/HQScene.tsx`](web/src/components/hq/HQScene.tsx) | [`/api/crew`](https://aquahab.up.railway.app/api/crew) and room memory counts |
-| **The Telegram workflow is protected** | [`server/src/telegram.ts`](server/src/telegram.ts) | CEO pairing, brief receipts, capture lifecycle, and `/web` magic link |
-| **The system survives real failures** | [`docs/FRICTION.md`](docs/FRICTION.md) | Queue backoff, retry, timeout, degraded brief, and identifier conversion code |
 
 ## Scope and known limits
 
-Aquahab is a **one-CEO hackathon deployment**. Reads are intentionally public so judges can walk the real office; CEO writes require the Telegram `/web` session. The Telegram bot, [@Aquahab_Crew_bot](https://t.me/Aquahab_Crew_bot), answers only the one CEO chat it is paired with, so judges see it in the demo video and the team can run a live walkthrough on request. The current product does not claim permanent storage, automatic renewal, arbitrary agent creation, marketplace features, or multi-user production access control.
+Aquahab is a **one-CEO hackathon deployment**. Reads are public so judges can walk the real office; writes need the CEO's Telegram session. The bot, [`@Aquahab_Crew_bot`](https://t.me/Aquahab_Crew_bot), answers only the one CEO chat it is paired with, so judges see it in the demo video, and the team can run a live walkthrough on request. Aquahab does not claim permanent storage, automatic renewal, arbitrary agent creation, a marketplace, or multi-user access control.
 
-The system handles uncertainty explicitly: a queued memory is not shown as stored, a failed recall is not silently treated as no memory, and a model line without a valid recalled citation is not shown as evidence.
+Uncertainty is shown, never hidden: a queued memory is not shown as stored, a failed recall is not treated as "no memory", and a line without a real citation is not shown as evidence.
 
 ---
 
-**Total Recall · Track 02: Smart Agents for Real Life**<br />
-**Bonus target: Best Walrus Memory**
+**Total Recall · Track 02: Smart Agents for Real Life** · **Bonus target: Best Walrus Memory**
